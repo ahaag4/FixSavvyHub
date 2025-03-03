@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Request Service</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Request a Service</h1>
+  </header>
+  <main>
+    <form id="requestForm">
+      <label for="serviceType">Service Type:</label>
+      <select id="serviceType" required>
+        <option value="AC Repair">AC Repair</option>
+        <option value="Plumbing">Plumbing</option>
+        <option value="Electrical Work">Electrical Work</option>
+        <option value="Cleaning">Cleaning</option>
+      </select>
+
+      <label for="description">Description:</label>
+      <textarea id="description" placeholder="Describe your issue..." required></textarea>
+
+      <button type="submit">Submit Request</button>
+    </form>
+  </main>
+  <script src="assets/js/firebase.js"></script>
+  <script src="assets/js/requestService.js"></script>
+</body>
+</html>

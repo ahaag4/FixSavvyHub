@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Signup</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <h1>Signup</h1>
+  <form id="signup-form">
+    <input type="email" id="email" placeholder="Email" required>
+    <input type="password" id="password" placeholder="Password" required>
+    <label for="location">Location</label>
+<input type="text" id="location" placeholder="Enter your city" required />
+    <select id="role" required>
+      <option value="user">User</option>
+      <option value="service_provider">Service Provider</option>
+      <!--<option value="admin">Admin</option>-->
+    </select>
+    <button type="submit">Signup</button>
+  </form>
+  <script type="module" src="./assets/js/signup.js"></script>
+</body>
+</html>
