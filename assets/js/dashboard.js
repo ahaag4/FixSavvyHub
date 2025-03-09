@@ -1,13 +1,6 @@
 import { auth, db } from "./firebase.js";
 import {
-  doc,
-  getDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-  updateDoc,
-  setDoc,
+  doc, getDoc, getDocs, collection, query, where, updateDoc, setDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 // Initialize Dashboard
@@ -29,7 +22,6 @@ export async function initializeDashboard() {
     const role = userData.role;
     const dashboard = document.getElementById("dashboard");
 
-    // Load dashboard content based on user role
     if (role === "user") {
       loadUserDashboard(user.uid, dashboard, userData);
     } else if (role === "service_provider") {
@@ -43,30 +35,21 @@ export async function initializeDashboard() {
 }
 
 //
-// 1. Load User Dashboard
+// ✅ 1. Load User Dashboard
 //
 async function loadUserDashboard(userId, dashboard, userData) {
   const isProfileComplete = userData.address && userData.phone;
 
   dashboard.innerHTML = `
-    <section id="profile-completion" style="${isProfileComplete ? "display: none;" : ""}">
-      <h2>Complete Your Profile</h2>
-      <form id="user-profile-form">
-        <label for="address">Address</label>
-        <input type="text" id="address" required placeholder="Enter your address">
-        <label for="phone">Phone</label>
-        <input type="text" id="phone" required placeholder="Enter your phone number">
-        <button type="submit">Save Profile</button>
-      </form>
-    </section>
-    <section id="request-service" style="${isProfileComplete ? "" : "display: none;"}">
-      <h2>Request a Service</h2>
+    <section id="user-dashboard">
+      <h2>Welcome, ${userData.name}</h2>
+      <button onclick="window.location.href='profile.html'">View Profile</button>
+      <h3>Request a Service</h3>
       <form id="request-service-form">
         <label for="service">Service</label>
-<select id="service" required>
-          <option value="" disabled selected>Select a service</option>
-          ${services.map(service => `<option value="${service}">${service}</option>`).join("")}
-        </select>
+        <select id="service" required></select>
+        <label for="service-time">Preferred Date & Time</label>
+        <input type="datetime-local" id="service-time" required>
         <button type="submit">Request Service</button>
       </form>
       <h3>Your Service Requests</h3>
@@ -74,32 +57,37 @@ async function loadUserDashboard(userId, dashboard, userData) {
     </section>
   `;
 
-  if (!isProfileComplete) {
-    document.getElementById("user-profile-form").addEventListener("submit", (e) => saveUserProfile(e, userId));
-  } else {
-    loadServicesOptions();
-    loadUserRequests(userId);
-  }
-}
-
-async function saveUserProfile(e, userId) {
-  e.preventDefault();
-  const address = document.getElementById("address").value;
-  const phone = document.getElementById("phone").value;
-
-  if (!address || !phone) {
-    alert("Please complete all fields.");
-    return;
-  }
-
-  await updateDoc(doc(db, "users", userId), { address, phone });
-  alert("Profile updated successfully!");
-  document.getElementById("profile-completion").style.display = "none";
-  document.getElementById("request-service").style.display = "";
+  document.getElementById("request-service-form").addEventListener("submit", (e) => requestService(e, userId));
   loadServicesOptions();
   loadUserRequests(userId);
 }
 
+//
+// ✅ 2. Request Service
+//
+async function requestService(e, userId) {
+  e.preventDefault();
+  const service = document.getElementById("service").value;
+  const serviceTime = document.getElementById("service-time").value;
+
+  const newRequest = {
+    serviceName: service,
+    requestedBy: userId,
+    status: "Pending",
+    dateTime: serviceTime,
+    paymentStatus: "Unpaid",
+    feedback: "",
+    assignedTo: null
+  };
+
+  await setDoc(doc(collection(db, "services")), newRequest);
+  alert("Service request submitted.");
+  loadUserRequests(userId);
+}
+
+//
+// ✅ 3. Load Services Options
+//
 async function loadServicesOptions() {
   const servicesSnapshot = await getDocs(collection(db, "available_services"));
   const serviceSelect = document.getElementById("service");
@@ -110,6 +98,9 @@ async function loadServicesOptions() {
   });
 }
 
+//
+// ✅ 4. Load User Requests
+//
 async function loadUserRequests(userId) {
   const requestsDiv = document.getElementById("user-requests");
   requestsDiv.innerHTML = "";
@@ -117,116 +108,82 @@ async function loadUserRequests(userId) {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
   const querySnapshot = await getDocs(q);
 
-  if (querySnapshot.empty) {
-    requestsDiv.innerHTML = `<p>No requests found.</p>`;
-    return;
-  }
-
   querySnapshot.forEach((doc) => {
     const data = doc.data();
     requestsDiv.innerHTML += `
-      <p><b>Service:</b> ${data.serviceName} | <b>Status:</b> ${data.status}</p>
+      <div>
+        <p><b>Service:</b> ${data.serviceName}</p>
+        <p><b>Status:</b> ${data.status}</p>
+        <p><b>Payment:</b> ${data.paymentStatus}</p>
+        <p><b>Completion Time:</b> ${data.completionTime || "N/A"}</p>
+        <p><b>Feedback:</b> ${data.feedback || "N/A"}</p>
+      </div>
     `;
   });
 }
 
 //
-// 2. Load Service Provider Dashboard
+// ✅ 5. Auto-Assign Services Based on Location
 //
-async function loadProviderDashboard(providerId, dashboard, userData) {
-  const isProfileComplete = userData.address && userData.phone && userData.govID;
+async function autoAssignService(serviceDoc) {
+  const serviceData = serviceDoc.data();
+  const userLocation = serviceData.userLocation;
+  
+  const q = query(collection(db, "users"), where("role", "==", "service_provider"));
+  const providersSnapshot = await getDocs(q);
 
-  dashboard.innerHTML = `
-    <section id="profile-completion" style="${isProfileComplete ? "display: none;" : ""}">
-      <h2>Complete Your Profile</h2>
-      <form id="provider-profile-form">
-        <label for="address">Address</label>
-        <input type="text" id="address" required placeholder="Enter your address">
-        <label for="phone">Phone</label>
-        <input type="text" id="phone" required placeholder="Enter your phone number">
-        <label for="gov-id">Upload Government ID</label>
-        <input type="file" id="gov-id" required>
-        <button type="submit">Save Profile</button>
-      </form>
-    </section>
-    <section id="assigned-requests" style="${isProfileComplete ? "" : "display: none;"}">
-      <h2>Assigned Services</h2>
-      <div id="provider-requests"></div>
-    </section>
-  `;
-
-  if (!isProfileComplete) {
-    document.getElementById("provider-profile-form").addEventListener("submit", (e) => saveProviderProfile(e, providerId));
-  } else {
-    loadProviderRequests(providerId);
-  }
-}
-
-async function saveProviderProfile(e, providerId) {
-  e.preventDefault();
-  const address = document.getElementById("address").value;
-  const phone = document.getElementById("phone").value;
-  const govID = document.getElementById("gov-id").files[0];
-
-  if (!address || !phone || !govID) {
-    alert("Please complete all fields.");
-    return;
-  }
-
-  await updateDoc(doc(db, "users", providerId), {
-    address,
-    phone,
-    govID: govID.name,
+  let nearestProvider = null;
+  providersSnapshot.forEach((providerDoc) => {
+    const providerData = providerDoc.data();
+    if (providerData.location === userLocation) {
+      nearestProvider = providerDoc.id;
+    }
   });
 
-  alert("Profile updated successfully!");
-  document.getElementById("profile-completion").style.display = "none";
-  document.getElementById("assigned-requests").style.display = "";
-  loadProviderRequests(providerId);
-}
-
-async function loadProviderRequests(providerId) {
-  const requestsDiv = document.getElementById("provider-requests");
-  requestsDiv.innerHTML = "";
-
-  const q = query(collection(db, "services"), where("assignedTo", "==", providerId));
-  const querySnapshot = await getDocs(q);
-
-  if (querySnapshot.empty) {
-    requestsDiv.innerHTML = `<p>No assigned services.</p>`;
-    return;
+  if (nearestProvider) {
+    await updateDoc(serviceDoc.ref, {
+      assignedTo: nearestProvider,
+      status: "Assigned"
+    });
   }
-
-  querySnapshot.forEach((doc) => {
-    const data = doc.data();
-    requestsDiv.innerHTML += `
-      <p><b>Service:</b> ${data.serviceName} | <b>Status:</b> ${data.status}</p>
-    `;
-  });
 }
 
 //
-// 3. Load Admin Dashboard
+// ✅ 6. Load Admin Dashboard
 //
 async function loadAdminDashboard(dashboard) {
   dashboard.innerHTML = `
-    <h2>Manage Services</h2>
+    <h2>All Services</h2>
     <div id="admin-requests"></div>
   `;
 
   const adminRequestsDiv = document.getElementById("admin-requests");
-  const querySnapshot = await getDocs(collection(db, "services"));
-
-  if (querySnapshot.empty) {
-    adminRequestsDiv.innerHTML = `<p>No services found.</p>`;
-    return;
-  }
-
-  querySnapshot.forEach((doc) => {
-    const data = doc.data();
-    adminRequestsDiv.innerHTML += `
-      <p><b>Service:</b> ${data.serviceName} | <b>Requested By:</b> ${data.requestedBy} | 
-      <b>Assigned To:</b> ${data.assignedTo || "Unassigned"} | <b>Status:</b> ${data.status}</p>
-    `;
+  onSnapshot(collection(db, "services"), (snapshot) => {
+    adminRequestsDiv.innerHTML = "";
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      adminRequestsDiv.innerHTML += `
+        <div>
+          <p><b>Service:</b> ${data.serviceName}</p>
+          <p><b>Status:</b> ${data.status}</p>
+          <p><b>Requested By:</b> ${data.requestedBy}</p>
+          <p><b>Payment:</b> ${data.paymentStatus}</p>
+          <p><b>Feedback:</b> ${data.feedback}</p>
+        </div>
+      `;
+    });
   });
 }
+
+//
+// ✅ 7. Notification System
+//
+onSnapshot(collection(db, "services"), (snapshot) => {
+  snapshot.docChanges().forEach((change) => {
+    if (change.type === "added" || change.type === "modified") {
+      new Notification("Service Update", {
+        body: `Service ${change.doc.data().serviceName} was ${change.doc.data().status}`
+      });
+    }
+  });
+});
