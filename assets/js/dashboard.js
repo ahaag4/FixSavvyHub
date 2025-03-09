@@ -2,9 +2,7 @@ import { auth, db, storage } from "./firebase.js";
 import {
   doc, getDoc, getDocs, collection, query, where, updateDoc, setDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-import {
-  ref, uploadBytes, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
 // Initialize Dashboard
 export async function initializeDashboard() {
@@ -51,6 +49,8 @@ async function loadUserDashboard(userId, dashboard, userData) {
         <select id="service" required></select>
         <label for="service-time">Preferred Date & Time</label>
         <input type="datetime-local" id="service-time" required>
+        <label for="gov-id">Upload Government ID (Aadhar/PAN)</label>
+        <input type="file" id="gov-id" accept="image/*,application/pdf">
         <button type="submit">Request Service</button>
       </form>
       <h3>Your Service Requests</h3>
@@ -70,6 +70,17 @@ async function requestService(e, userId) {
   e.preventDefault();
   const service = document.getElementById("service").value;
   const serviceTime = document.getElementById("service-time").value;
+  const fileInput = document.getElementById("gov-id").files[0];
+
+  if (!fileInput) {
+    alert("Please upload Aadhar or PAN Card.");
+    return;
+  }
+
+  // Upload the government ID
+  const storageRef = ref(storage, `gov_ids/${userId}_${fileInput.name}`);
+  await uploadBytes(storageRef, fileInput);
+  const fileURL = await getDownloadURL(storageRef);
 
   const newRequest = {
     serviceName: service,
@@ -78,7 +89,8 @@ async function requestService(e, userId) {
     dateTime: serviceTime,
     paymentStatus: "Unpaid",
     feedback: "",
-    assignedTo: null
+    assignedTo: null,
+    govIdUrl: fileURL
   };
 
   await setDoc(doc(collection(db, "services")), newRequest);
@@ -116,38 +128,59 @@ async function loadUserRequests(userId) {
         <p><b>Service:</b> ${data.serviceName}</p>
         <p><b>Status:</b> ${data.status}</p>
         <p><b>Payment:</b> ${data.paymentStatus}</p>
-        <p><b>Completion Time:</b> ${data.completionTime || "N/A"}</p>
-        <p><b>Feedback:</b> ${data.feedback || "N/A"}</p>
+        <p><b>Government ID:</b> <a href="${data.govIdUrl}" target="_blank">View ID</a></p>
       </div>
     `;
   });
 }
 
 //
-// ✅ 5. Upload Profile Picture & Government ID
+// ✅ 5. Load Provider Dashboard
 //
-async function uploadFile(file, fileType, userId) {
-  const fileRef = ref(storage, `${fileType}/${userId}`);
-  await uploadBytes(fileRef, file);
-  const url = await getDownloadURL(fileRef);
+async function loadProviderDashboard(userId, dashboard) {
+  dashboard.innerHTML = `<h2>Your Assigned Services</h2><div id="provider-requests"></div>`;
+  const requestsDiv = document.getElementById("provider-requests");
 
-  await updateDoc(doc(db, "users", userId), {
-    [fileType]: url
+  const q = query(collection(db, "services"), where("assignedTo", "==", userId));
+  onSnapshot(q, (snapshot) => {
+    requestsDiv.innerHTML = "";
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      requestsDiv.innerHTML += `
+        <div>
+          <p><b>Service:</b> ${data.serviceName}</p>
+          <p><b>Status:</b> ${data.status}</p>
+          <p><b>Government ID:</b> <a href="${data.govIdUrl}" target="_blank">View ID</a></p>
+        </div>
+      `;
+    });
   });
-
-  alert(`${fileType} uploaded successfully.`);
 }
 
-document.getElementById("profile-picture").addEventListener("change", (e) => {
-  uploadFile(e.target.files[0], "profilePicture", auth.currentUser.uid);
-});
+//
+// ✅ 6. Load Admin Dashboard
+//
+async function loadAdminDashboard(dashboard) {
+  dashboard.innerHTML = `<h2>All Service Requests</h2><div id="admin-requests"></div>`;
+  const requestsDiv = document.getElementById("admin-requests");
 
-document.getElementById("gov-id").addEventListener("change", (e) => {
-  uploadFile(e.target.files[0], "govId", auth.currentUser.uid);
-});
+  onSnapshot(collection(db, "services"), (snapshot) => {
+    requestsDiv.innerHTML = "";
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      requestsDiv.innerHTML += `
+        <div>
+          <p><b>Service:</b> ${data.serviceName}</p>
+          <p><b>Status:</b> ${data.status}</p>
+          <p><b>Government ID:</b> <a href="${data.govIdUrl}" target="_blank">View ID</a></p>
+        </div>
+      `;
+    });
+  });
+}
 
 //
-// ✅ 6. Auto-Assign Services
+// ✅ 7. Auto Assign Services
 //
 async function autoAssignService(serviceDoc) {
   const serviceData = serviceDoc.data();
@@ -171,12 +204,3 @@ async function autoAssignService(serviceDoc) {
     });
   }
 }
-
-//
-// ✅ 7. Logout
-//
-document.getElementById("logout").addEventListener("click", () => {
-  auth.signOut().then(() => {
-    window.location.href = "signin.html";
-  });
-});
