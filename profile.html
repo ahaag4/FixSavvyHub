@@ -3,90 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/assets/css/style.css">
   <title>Profile</title>
+  <script type="module" src="./profile.js"></script>
 </head>
 <body>
-  <h2>Profile Page</h2>
-  <form id="profile-form">
-    <label for="name">Name</label>
-    <input type="text" id="name" required><br>
 
-    <label for="phone">Phone</label>
-    <input type="text" id="phone" required><br>
+<h2>User Profile</h2>
+<div id="profile-section">
+  <p><b>Name:</b> <span id="name"></span></p>
+  <p><b>Email:</b> <span id="email"></span></p>
+  <p><b>Phone:</b> <span id="phone"></span></p>
+  <p><b>Address:</b> <span id="address"></span></p>
+  <p><b>Role:</b> <span id="role"></span></p>
+  <p><b>Government ID:</b> <a id="gov-id" href="#" target="_blank">View ID</a></p>
+  
+  <button id="edit-btn">Edit Profile</button>
+  
+  <div id="edit-section" style="display: none;">
+    <h3>Edit Profile</h3>
+    <form id="profile-form">
+      <label for="phone">Phone</label>
+      <input type="text" id="edit-phone" required>
+      
+      <label for="address">Address</label>
+      <input type="text" id="edit-address" required>
+      
+      <label for="gov-id-file">Upload Government ID</label>
+      <input type="file" id="gov-id-file">
+      
+      <button type="submit">Save Changes</button>
+    </form>
+  </div>
+</div>
 
-    <label for="address">Address</label>
-    <textarea id="address" required></textarea><br>
-
-    <label for="profile-pic">Profile Picture</label>
-    <input type="file" id="profile-pic"><br>
-
-    <label for="gov-id">Upload Aadhaar/PAN</label>
-    <input type="file" id="gov-id"><br>
-
-    <button type="submit">Save Changes</button>
-  </form>
-
-  <button onclick="window.location.href='dashboard.html'">Back to Dashboard</button>
-  <button onclick="logout()">Logout</button>
-
-  <script type="module">
-    import { auth, db, storage } from "./firebase.js";
-    import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
-    import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-
-    auth.onAuthStateChanged(async (user) => {
-      if (!user) {
-        alert("Not signed in");
-        window.location.href = "signin.html";
-        return;
-      }
-
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        document.getElementById("name").value = data.name;
-        document.getElementById("phone").value = data.phone;
-        document.getElementById("address").value = data.address;
-      }
-    });
-
-    document.getElementById("profile-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const name = document.getElementById("name").value;
-      const phone = document.getElementById("phone").value;
-      const address = document.getElementById("address").value;
-      const profilePic = document.getElementById("profile-pic").files[0];
-      const govId = document.getElementById("gov-id").files[0];
-
-      let profilePicURL = "";
-      let govIdURL = "";
-
-      if (profilePic) {
-        const profileRef = ref(storage, `profiles/${auth.currentUser.uid}`);
-        await uploadBytes(profileRef, profilePic);
-        profilePicURL = await getDownloadURL(profileRef);
-      }
-
-      if (govId) {
-        const govIdRef = ref(storage, `gov-ids/${auth.currentUser.uid}`);
-        await uploadBytes(govIdRef, govId);
-        govIdURL = await getDownloadURL(govIdRef);
-      }
-
-      await setDoc(doc(db, "users", auth.currentUser.uid), {
-        name, phone, address,
-        profilePic: profilePicURL,
-        govId: govIdURL
-      }, { merge: true });
-
-      alert("Profile updated successfully!");
-    });
-
-    function logout() {
-      auth.signOut();
-      window.location.href = "signin.html";
-    }
-  </script>
 </body>
 </html>
