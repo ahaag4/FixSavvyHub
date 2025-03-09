@@ -3,120 +3,89 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Profile Page</title>
-  <style>
-    body { font-family: Arial, sans-serif; }
-    .container { max-width: 600px; margin: 20px auto; text-align: center; }
-    img { width: 120px; height: 120px; border-radius: 50%; }
-    input, textarea, button { display: block; width: 100%; margin-bottom: 15px; padding: 10px; }
-    button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-    button:hover { background-color: #388E3C; }
-  </style>
+  <title>Profile</title>
 </head>
 <body>
+  <h2>Profile Page</h2>
+  <form id="profile-form">
+    <label for="name">Name</label>
+    <input type="text" id="name" required><br>
 
-<div class="container">
-  <h2>User Profile</h2>
-  <img id="profile-image" src="default-avatar.png" alt="Profile Picture">
-  <input type="file" id="upload-image" accept="image/*">
-  
-  <label>Name:</label>
-  <input type="text" id="name">
-  
-  <label>Email:</label>
-  <input type="email" id="email" disabled>
-  
-  <label>Phone:</label>
-  <input type="text" id="phone">
-  
-  <label>Address:</label>
-  <textarea id="address"></textarea>
-  
-  <button onclick="saveProfile()">Save Changes</button>
+    <label for="phone">Phone</label>
+    <input type="text" id="phone" required><br>
+
+    <label for="address">Address</label>
+    <textarea id="address" required></textarea><br>
+
+    <label for="profile-pic">Profile Picture</label>
+    <input type="file" id="profile-pic"><br>
+
+    <label for="gov-id">Upload Aadhaar/PAN</label>
+    <input type="file" id="gov-id"><br>
+
+    <button type="submit">Save Changes</button>
+  </form>
+
+  <button onclick="window.location.href='dashboard.html'">Back to Dashboard</button>
   <button onclick="logout()">Logout</button>
-</div>
 
-<script type="module">
-  import { auth, db, storage } from "./firebase.js";
-  import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-  import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
-  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+  <script type="module">
+    import { auth, db, storage } from "./firebase.js";
+    import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+    import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-  let userId = null;
-  const profileImage = document.getElementById("profile-image");
-  const uploadImage = document.getElementById("upload-image");
-
-  // ✅ Check if user is authenticated
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      alert("Not signed in. Redirecting to login.");
-      window.location.href = "signin.html";
-      return;
-    }
-
-    userId = user.uid;
-    loadUserProfile(userId);
-  });
-
-  // ✅ Load user profile data
-  async function loadUserProfile(userId) {
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (userDoc.exists()) {
-      const data = userDoc.data();
-      document.getElementById("name").value = data.name || "";
-      document.getElementById("email").value = data.email || "";
-      document.getElementById("phone").value = data.phone || "";
-      document.getElementById("address").value = data.address || "";
-
-      if (data.profileImage) {
-        profileImage.src = data.profileImage;
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        alert("Not signed in");
+        window.location.href = "signin.html";
+        return;
       }
-    } else {
-      alert("User data not found.");
-      window.location.href = "dashboard.html";
-    }
-  }
 
-  // ✅ Upload profile image
-  uploadImage.addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const imageRef = ref(storage, `profile_images/${userId}`);
-    await uploadBytes(imageRef, file);
-
-    const imageUrl = await getDownloadURL(imageRef);
-    profileImage.src = imageUrl;
-
-    await updateDoc(doc(db, "users", userId), {
-      profileImage: imageUrl
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        document.getElementById("name").value = data.name;
+        document.getElementById("phone").value = data.phone;
+        document.getElementById("address").value = data.address;
+      }
     });
 
-    alert("Profile picture updated.");
-  });
+    document.getElementById("profile-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("name").value;
+      const phone = document.getElementById("phone").value;
+      const address = document.getElementById("address").value;
+      const profilePic = document.getElementById("profile-pic").files[0];
+      const govId = document.getElementById("gov-id").files[0];
 
-  // ✅ Save profile data
-  async function saveProfile() {
-    const name = document.getElementById("name").value;
-    const phone = document.getElementById("phone").value;
-    const address = document.getElementById("address").value;
+      let profilePicURL = "";
+      let govIdURL = "";
 
-    await updateDoc(doc(db, "users", userId), {
-      name, phone, address
+      if (profilePic) {
+        const profileRef = ref(storage, `profiles/${auth.currentUser.uid}`);
+        await uploadBytes(profileRef, profilePic);
+        profilePicURL = await getDownloadURL(profileRef);
+      }
+
+      if (govId) {
+        const govIdRef = ref(storage, `gov-ids/${auth.currentUser.uid}`);
+        await uploadBytes(govIdRef, govId);
+        govIdURL = await getDownloadURL(govIdRef);
+      }
+
+      await setDoc(doc(db, "users", auth.currentUser.uid), {
+        name, phone, address,
+        profilePic: profilePicURL,
+        govId: govIdURL
+      }, { merge: true });
+
+      alert("Profile updated successfully!");
     });
 
-    alert("Profile updated successfully.");
-  }
-
-  // ✅ Logout function
-  function logout() {
-    signOut(auth).then(() => {
+    function logout() {
+      auth.signOut();
       window.location.href = "signin.html";
-    }).catch((error) => {
-      alert("Failed to logout. Try again.");
-    });
-  }
-</script>
-
+    }
+  </script>
 </body>
 </html>
