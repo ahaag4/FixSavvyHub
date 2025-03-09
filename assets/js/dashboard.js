@@ -55,7 +55,8 @@ async function loadUserDashboard(userId, dashboard, userData) {
       <h3>Request a Service</h3>
       <form id="request-service-form">
         <select id="service" required>
-          <option value="" disabled selected>Select a service</option>
+                    <option value="" disabled selected>Select a service</option>
+          ${services.map(service => `<option value="${service}">${service}</option>`).join("")}
         </select>
         <button type="submit">Request Service</button>
       </form>
