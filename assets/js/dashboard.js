@@ -1,113 +1,165 @@
 import { auth, db, storage } from "./firebase.js";
 import {
-  collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot, getDoc
+  doc, getDoc, getDocs, collection, query, where, updateDoc, setDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-import { ref, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+import {
+  ref, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
-// ✅ Ensure User Is Signed In
-auth.onAuthStateChanged(async (user) => {
-  if (!user) {
-    window.location.href = "signin.html";
-    return;
-  }
+// Initialize Dashboard
+export async function initializeDashboard() {
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+      alert("Not signed in. Redirecting to sign-in page.");
+      window.location.href = "signin.html";
+      return;
+    }
 
-  loadUserProfile(user.uid);
-  loadAvailableServices();
-  loadUserRequests(user.uid);
-});
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    if (!userDoc.exists()) {
+      alert("User data not found!");
+      return;
+    }
 
-// ✅ Load User Profile
-async function loadUserProfile(userId) {
-  const userDoc = await getDoc(doc(db, "users", userId));
-  if (!userDoc.exists()) return;
+    const userData = userDoc.data();
+    const role = userData.role;
+    const dashboard = document.getElementById("dashboard");
 
-  const userData = userDoc.data();
-  document.getElementById("user-name").innerText = userData.name;
-  document.getElementById("user-phone").innerText = userData.phone;
-  document.getElementById("user-address").innerText = userData.address;
-
-  // ✅ Load Profile Picture
-  if (userData.profilePic) {
-    document.getElementById("user-pic").src = userData.profilePic;
-  }
-
-  // ✅ Load Aadhaar/PAN Card
-  if (userData.govId) {
-    document.getElementById("user-gov-id").innerHTML = `
-      <a href="${userData.govId}" target="_blank">View Aadhaar/PAN Card</a>
-    `;
-  }
+    if (role === "user") {
+      loadUserDashboard(user.uid, dashboard, userData);
+    } else if (role === "service_provider") {
+      loadProviderDashboard(user.uid, dashboard, userData);
+    } else if (role === "admin") {
+      loadAdminDashboard(dashboard);
+    } else {
+      dashboard.innerHTML = `<p>Role not recognized.</p>`;
+    }
+  });
 }
 
-// ✅ Load Services Dropdown
-async function loadAvailableServices() {
+//
+// ✅ 1. Load User Dashboard
+//
+async function loadUserDashboard(userId, dashboard, userData) {
+  dashboard.innerHTML = `
+    <section id="user-dashboard">
+      <h2>Welcome, ${userData.name}</h2>
+      <button onclick="window.location.href='profile.html'">View Profile</button>
+      <h3>Request a Service</h3>
+      <form id="request-service-form">
+        <label for="service">Service</label>
+        <select id="service" required></select>
+        <label for="service-time">Preferred Date & Time</label>
+        <input type="datetime-local" id="service-time" required>
+        <button type="submit">Request Service</button>
+      </form>
+      <h3>Your Service Requests</h3>
+      <div id="user-requests"></div>
+    </section>
+  `;
+
+  document.getElementById("request-service-form").addEventListener("submit", (e) => requestService(e, userId));
+  loadServicesOptions();
+  loadUserRequests(userId);
+}
+
+//
+// ✅ 2. Request Service
+//
+async function requestService(e, userId) {
+  e.preventDefault();
+  const service = document.getElementById("service").value;
+  const serviceTime = document.getElementById("service-time").value;
+
+  const newRequest = {
+    serviceName: service,
+    requestedBy: userId,
+    status: "Pending",
+    dateTime: serviceTime,
+    paymentStatus: "Unpaid",
+    feedback: "",
+    assignedTo: null
+  };
+
+  await setDoc(doc(collection(db, "services")), newRequest);
+  alert("Service request submitted.");
+  loadUserRequests(userId);
+}
+
+//
+// ✅ 3. Load Services Options
+//
+async function loadServicesOptions() {
+  const servicesSnapshot = await getDocs(collection(db, "available_services"));
   const serviceSelect = document.getElementById("service");
-  const snapshot = await getDocs(collection(db, "available_services"));
-  snapshot.forEach(doc => {
+  serviceSelect.innerHTML = `<option value="" disabled selected>Select a service</option>`;
+  servicesSnapshot.forEach((doc) => {
     const service = doc.data();
     serviceSelect.innerHTML += `<option value="${service.name}">${service.name}</option>`;
   });
 }
 
-// ✅ Request Service
-document.getElementById("service-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const service = document.getElementById("service").value;
-  const dateTime = document.getElementById("date-time").value;
-  const userId = auth.currentUser.uid;
-
-  const newRequest = {
-    serviceName: service,
-    userId: userId,
-    status: "Pending",
-    dateTime: dateTime,
-    assignedTo: null
-  };
-
-  await setDoc(doc(collection(db, "services")), newRequest);
-  alert("Service requested successfully.");
-  loadUserRequests(userId);
-});
-
-// ✅ Load User Requests
+//
+// ✅ 4. Load User Requests
+//
 async function loadUserRequests(userId) {
-  const requestDiv = document.getElementById("requests");
-  requestDiv.innerHTML = "";
+  const requestsDiv = document.getElementById("user-requests");
+  requestsDiv.innerHTML = "";
 
-  const q = query(collection(db, "services"), where("userId", "==", userId));
-  const snapshot = await getDocs(q);
+  const q = query(collection(db, "services"), where("requestedBy", "==", userId));
+  const querySnapshot = await getDocs(q);
 
-  snapshot.forEach(doc => {
+  querySnapshot.forEach((doc) => {
     const data = doc.data();
-    requestDiv.innerHTML += `
+    requestsDiv.innerHTML += `
       <div>
         <p><b>Service:</b> ${data.serviceName}</p>
         <p><b>Status:</b> ${data.status}</p>
-        <p><b>Date:</b> ${data.dateTime}</p>
-        <p><b>Assigned To:</b> ${data.assignedTo || "Not Assigned"}</p>
-        <hr>
+        <p><b>Payment:</b> ${data.paymentStatus}</p>
+        <p><b>Completion Time:</b> ${data.completionTime || "N/A"}</p>
+        <p><b>Feedback:</b> ${data.feedback || "N/A"}</p>
       </div>
     `;
-
-    if (data.status === "Pending") {
-      autoAssignService(doc);
-    }
   });
 }
 
-// ✅ Auto-Assign Service Based on Location
+//
+// ✅ 5. Upload Profile Picture & Government ID
+//
+async function uploadFile(file, fileType, userId) {
+  const fileRef = ref(storage, `${fileType}/${userId}`);
+  await uploadBytes(fileRef, file);
+  const url = await getDownloadURL(fileRef);
+
+  await updateDoc(doc(db, "users", userId), {
+    [fileType]: url
+  });
+
+  alert(`${fileType} uploaded successfully.`);
+}
+
+document.getElementById("profile-picture").addEventListener("change", (e) => {
+  uploadFile(e.target.files[0], "profilePicture", auth.currentUser.uid);
+});
+
+document.getElementById("gov-id").addEventListener("change", (e) => {
+  uploadFile(e.target.files[0], "govId", auth.currentUser.uid);
+});
+
+//
+// ✅ 6. Auto-Assign Services
+//
 async function autoAssignService(serviceDoc) {
   const serviceData = serviceDoc.data();
-  const userDoc = await getDoc(doc(db, "users", serviceData.userId));
-  const userLocation = userDoc.data().address;
-
+  const userLocation = serviceData.userLocation;
+  
   const q = query(collection(db, "users"), where("role", "==", "service_provider"));
   const providersSnapshot = await getDocs(q);
 
   let nearestProvider = null;
-  providersSnapshot.forEach(providerDoc => {
+  providersSnapshot.forEach((providerDoc) => {
     const providerData = providerDoc.data();
-    if (providerData.address === userLocation) {
+    if (providerData.location === userLocation) {
       nearestProvider = providerDoc.id;
     }
   });
@@ -117,15 +169,14 @@ async function autoAssignService(serviceDoc) {
       assignedTo: nearestProvider,
       status: "Assigned"
     });
-
-    alert("Service has been auto-assigned to a provider.");
-    loadUserRequests(auth.currentUser.uid);
   }
 }
 
-// ✅ Logout Function
-function logout() {
-  auth.signOut();
-  window.location.href = "signin.html";
-}
-document.getElementById("logout-btn").addEventListener("click", logout);
+//
+// ✅ 7. Logout
+//
+document.getElementById("logout").addEventListener("click", () => {
+  auth.signOut().then(() => {
+    window.location.href = "signin.html";
+  });
+});
