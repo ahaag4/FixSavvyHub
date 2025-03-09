@@ -1,23 +1,23 @@
 import { auth, db, storage } from "./firebase.js";
 import {
-  collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot
+  collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot, getDoc
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 import { ref, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
-// ✅ Listen to Authentication State
+// ✅ Ensure User Is Signed In
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     window.location.href = "signin.html";
     return;
   }
 
-  loadProfile(user.uid);
-  loadServices();
-  loadRequests(user.uid);
+  loadUserProfile(user.uid);
+  loadAvailableServices();
+  loadUserRequests(user.uid);
 });
 
-// ✅ Load User Profile in Dashboard
-async function loadProfile(userId) {
+// ✅ Load User Profile
+async function loadUserProfile(userId) {
   const userDoc = await getDoc(doc(db, "users", userId));
   if (!userDoc.exists()) return;
 
@@ -40,7 +40,7 @@ async function loadProfile(userId) {
 }
 
 // ✅ Load Services Dropdown
-async function loadServices() {
+async function loadAvailableServices() {
   const serviceSelect = document.getElementById("service");
   const snapshot = await getDocs(collection(db, "available_services"));
   snapshot.forEach(doc => {
@@ -58,19 +58,19 @@ document.getElementById("service-form").addEventListener("submit", async (e) => 
 
   const newRequest = {
     serviceName: service,
-    userId,
+    userId: userId,
     status: "Pending",
-    dateTime,
+    dateTime: dateTime,
     assignedTo: null
   };
 
   await setDoc(doc(collection(db, "services")), newRequest);
   alert("Service requested successfully.");
-  loadRequests(userId);
+  loadUserRequests(userId);
 });
 
-// ✅ Load Requests
-async function loadRequests(userId) {
+// ✅ Load User Requests
+async function loadUserRequests(userId) {
   const requestDiv = document.getElementById("requests");
   requestDiv.innerHTML = "";
 
@@ -119,7 +119,7 @@ async function autoAssignService(serviceDoc) {
     });
 
     alert("Service has been auto-assigned to a provider.");
-    loadRequests(auth.currentUser.uid);
+    loadUserRequests(auth.currentUser.uid);
   }
 }
 
