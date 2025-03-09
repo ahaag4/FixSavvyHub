@@ -6,40 +6,36 @@ import {
   ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
-// Initialize Dashboard
-export async function initializeDashboard() {
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) {
-      alert("Not signed in. Redirecting to sign-in page.");
-      window.location.href = "signin.html";
-      return;
-    }
+// ✅ Fix 1: Dashboard Initialization
+auth.onAuthStateChanged(async (user) => {
+  if (!user) {
+    alert("Not signed in. Redirecting to sign-in page.");
+    window.location.href = "signin.html";
+    return;
+  }
 
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    if (!userDoc.exists()) {
-      alert("User data not found!");
-      return;
-    }
+  const userDoc = await getDoc(doc(db, "users", user.uid));
+  if (!userDoc.exists()) {
+    alert("User data not found!");
+    return;
+  }
 
-    const userData = userDoc.data();
-    const role = userData.role;
-    const dashboard = document.getElementById("dashboard");
+  const userData = userDoc.data();
+  const role = userData.role;
+  const dashboard = document.getElementById("dashboard");
 
-    if (role === "user") {
-      loadUserDashboard(user.uid, dashboard, userData);
-    } else if (role === "service_provider") {
-      loadProviderDashboard(user.uid, dashboard, userData);
-    } else if (role === "admin") {
-      loadAdminDashboard(dashboard);
-    } else {
-      dashboard.innerHTML = `<p>Role not recognized.</p>`;
-    }
-  });
-}
+  if (role === "user") {
+    loadUserDashboard(user.uid, dashboard, userData);
+  } else if (role === "service_provider") {
+    loadProviderDashboard(user.uid, dashboard, userData);
+  } else if (role === "admin") {
+    loadAdminDashboard(dashboard);
+  } else {
+    dashboard.innerHTML = `<p>Role not recognized.</p>`;
+  }
+});
 
-//
-// ✅ 1. Load User Dashboard
-//
+// ✅ Fix 2: Load User Dashboard
 async function loadUserDashboard(userId, dashboard, userData) {
   dashboard.innerHTML = `
     <h2>Welcome, ${userData.name}</h2>
@@ -61,9 +57,21 @@ async function loadUserDashboard(userId, dashboard, userData) {
   loadUserRequests(userId);
 }
 
-//
-// ✅ 2. Request Service
-//
+// ✅ Fix 3: Load Services Options (Prevent Undefined Error)
+async function loadServicesOptions() {
+  const serviceSelect = document.getElementById("service");
+  serviceSelect.innerHTML = `<option value="" disabled selected>Loading services...</option>`;
+
+  const servicesSnapshot = await getDocs(collection(db, "available_services"));
+  serviceSelect.innerHTML = `<option value="" disabled selected>Select a service</option>`;
+  
+  servicesSnapshot.forEach((doc) => {
+    const service = doc.data();
+    serviceSelect.innerHTML += `<option value="${service.name}">${service.name}</option>`;
+  });
+}
+
+// ✅ Fix 4: Request Service
 async function requestService(e, userId) {
   e.preventDefault();
   const service = document.getElementById("service").value;
@@ -84,22 +92,7 @@ async function requestService(e, userId) {
   loadUserRequests(userId);
 }
 
-//
-// ✅ 3. Load Services Options
-//
-async function loadServicesOptions() {
-  const servicesSnapshot = await getDocs(collection(db, "available_services"));
-  const serviceSelect = document.getElementById("service");
-  serviceSelect.innerHTML = `<option value="" disabled selected>Select a service</option>`;
-  servicesSnapshot.forEach((doc) => {
-    const service = doc.data();
-    serviceSelect.innerHTML += `<option value="${service.name}">${service.name}</option>`;
-  });
-}
-
-//
-// ✅ 4. Load User Requests
-//
+// ✅ Fix 5: Load User Requests
 async function loadUserRequests(userId) {
   const requestsDiv = document.getElementById("user-requests");
   requestsDiv.innerHTML = "";
@@ -120,13 +113,11 @@ async function loadUserRequests(userId) {
   });
 }
 
-//
-// ✅ 5. Load Service Provider Dashboard
-//
+// ✅ Fix 6: Load Service Provider Dashboard
 async function loadProviderDashboard(providerId, dashboard, userData) {
   dashboard.innerHTML = `
     <h2>Welcome, ${userData.name}</h2>
-    <h3>Upload Government ID</h3>
+    <h3>Upload Government ID (Aadhaar/PAN)</h3>
     <form id="upload-id-form">
       <input type="file" id="gov-id" required>
       <button type="submit">Upload</button>
@@ -139,9 +130,7 @@ async function loadProviderDashboard(providerId, dashboard, userData) {
   loadProviderRequests(providerId);
 }
 
-//
-// ✅ 6. Upload Government ID
-//
+// ✅ Fix 7: Upload Government ID (Aadhaar/PAN)
 async function uploadGovernmentID(e, providerId) {
   e.preventDefault();
   const file = document.getElementById("gov-id").files[0];
@@ -158,9 +147,26 @@ async function uploadGovernmentID(e, providerId) {
   alert("Government ID uploaded successfully!");
 }
 
-//
-// ✅ 7. Load Admin Dashboard
-//
+// ✅ Fix 8: Load Provider Requests
+async function loadProviderRequests(providerId) {
+  const requestsDiv = document.getElementById("provider-requests");
+  requestsDiv.innerHTML = "";
+
+  const q = query(collection(db, "services"), where("assignedTo", "==", providerId));
+  const querySnapshot = await getDocs(q);
+
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    requestsDiv.innerHTML += `
+      <div>
+        <p><b>Service:</b> ${data.serviceName}</p>
+        <p><b>Status:</b> ${data.status}</p>
+      </div>
+    `;
+  });
+}
+
+// ✅ Fix 9: Load Admin Dashboard
 async function loadAdminDashboard(dashboard) {
   dashboard.innerHTML = `
     <h2>All Service Requests</h2>
