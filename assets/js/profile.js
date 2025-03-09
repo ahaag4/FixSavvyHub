@@ -2,119 +2,42 @@ import { auth, db } from "./firebase.js";
 import {
   doc,
   getDoc,
-  query,
-  collection,
-  where,
-  getDocs
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-// ✅ Automatically load profile based on URL
-window.onload = async () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
-  const userId = urlParams.get('id');
+  const userId = urlParams.get("user");
+  const profileContainer = document.getElementById("profile-container");
 
   if (!userId) {
-    alert("Invalid profile URL!");
-    window.location.href = "dashboard.html";
+    profileContainer.innerHTML = `<p>User ID not provided.</p>`;
     return;
   }
 
-  // ✅ Fetch logged-in user
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) {
-      alert("Please sign in first.");
-      window.location.href = "signin.html";
-      return;
-    }
-
-    const loggedInUserDoc = await getDoc(doc(db, "users", user.uid));
-    const loggedInUser = loggedInUserDoc.data();
-
-    // ✅ Admin can access any profile
-    if (loggedInUser.role === "admin") {
-      await loadProfile(userId);
-      return;
-    }
-
-    // ✅ Service Provider can access:
-    //     1. Their own profile
-    //     2. The User's profile assigned to them
-    if (loggedInUser.role === "service_provider") {
-      if (user.uid === userId) {
-        await loadProfile(userId);
-        return;
-      }
-
-      const assignedUserId = await getAssignedUserId(user.uid);
-      if (assignedUserId === userId) {
-        await loadProfile(userId);
-        return;
-      }
-
-      alert("Access denied. You can only view your assigned user's profile.");
-      window.location.href = "dashboard.html";
-      return;
-    }
-
-    // ✅ User can only access their assigned service provider's profile
-    if (loggedInUser.role === "user") {
-      const assignedProviderId = await getAssignedProviderId(user.uid);
-      if (assignedProviderId === userId) {
-        await loadProfile(userId);
-        return;
-      }
-
-      alert("Access denied. You can only view your assigned provider's profile.");
-      window.location.href = "dashboard.html";
-      return;
-    }
-
-    // ✅ Default: No access
-    alert("Access denied.");
-    window.location.href = "dashboard.html";
-  });
-};
-
-// ✅ Function to load profile details
-async function loadProfile(userId) {
   const userDoc = await getDoc(doc(db, "users", userId));
   if (!userDoc.exists()) {
-    alert("Profile not found.");
-    window.location.href = "dashboard.html";
+    profileContainer.innerHTML = `<p>User not found.</p>`;
     return;
   }
 
   const userData = userDoc.data();
-  document.getElementById('name').innerText = userData.name;
-  document.getElementById('email').innerText = userData.email;
-  document.getElementById('phone').innerText = userData.phone || 'N/A';
-  document.getElementById('address').innerText = userData.address || 'N/A';
-  document.getElementById('role').innerText = userData.role;
-  document.getElementById('gov-id').innerText = userData.govID || 'N/A';
+  renderProfile(userData);
+});
+
+function renderProfile(userData) {
+  const profileContainer = document.getElementById("profile-container");
+
+  const profileHTML = `
+    <div class="profile-card">
+      <h2>${userData.name}</h2>
+      <p><strong>Email:</strong> ${userData.email}</p>
+      <p><strong>Phone:</strong> ${userData.phone || 'N/A'}</p>
+      <p><strong>Address:</strong> ${userData.address || 'N/A'}</p>
+      <p><strong>Role:</strong> ${userData.role}</p>
+      <p><strong>Location:</strong> ${userData.location || 'N/A'}</p>
+      ${userData.govID ? `<a class="download-btn" href="${userData.govID}" target="_blank">Download Gov ID</a>` : ''}
+    </div>
+  `;
+
+  profileContainer.innerHTML = profileHTML;
 }
-
-// ✅ Function to get the assigned provider's ID for a user
-async function getAssignedProviderId(userId) {
-  const q = query(collection(db, "services"), where("requestedBy", "==", userId));
-  const querySnapshot = await getDocs(q);
-
-  if (querySnapshot.empty) {
-    return null;
-  }
-
-  const serviceData = querySnapshot.docs[0].data();
-  return serviceData.assignedTo;
-}
-
-// ✅ Function to get the assigned user's ID for a service provider
-async function getAssignedUserId(providerId) {
-  const q = query(collection(db, "services"), where("assignedTo", "==", providerId));
-  const querySnapshot = await getDocs(q);
-
-  if (querySnapshot.empty) {
-    return null;
-  }
-
-  const serviceData = querySnapshot.docs[0].data();
-  return serviceData.requestedBy;
-    }
