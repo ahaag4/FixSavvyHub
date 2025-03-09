@@ -38,12 +38,10 @@ export async function initializeDashboard() {
 // ✅ 1. Load User Dashboard
 //
 async function loadUserDashboard(userId, dashboard, userData) {
-  const isProfileComplete = userData.address && userData.phone;
-
   dashboard.innerHTML = `
     <section id="user-dashboard">
       <h2>Welcome, ${userData.name}</h2>
-      <button onclick="window.location.href='profile.html'">View Profile</button>
+      <button id="view-profile-btn">View Profile</button>
       <h3>Request a Service</h3>
       <form id="request-service-form">
         <label for="service">Service</label>
@@ -57,6 +55,10 @@ async function loadUserDashboard(userId, dashboard, userData) {
     </section>
   `;
 
+  document.getElementById("view-profile-btn").addEventListener("click", () => {
+    window.location.href = `profile.html?uid=${userId}`;
+  });
+
   document.getElementById("request-service-form").addEventListener("submit", (e) => requestService(e, userId));
   loadServicesOptions();
   loadUserRequests(userId);
@@ -67,7 +69,14 @@ async function loadUserDashboard(userId, dashboard, userData) {
 //
 async function requestService(e, userId) {
   e.preventDefault();
-  const service = document.getElementById("service").value;
+  const serviceSelect = document.getElementById("service");
+
+  if (serviceSelect.selectedIndex === 0) {
+    alert("Please select a valid service.");
+    return;
+  }
+
+  const service = serviceSelect.options[serviceSelect.selectedIndex].text;
   const serviceTime = document.getElementById("service-time").value;
 
   const newRequest = {
@@ -92,6 +101,7 @@ async function loadServicesOptions() {
   const servicesSnapshot = await getDocs(collection(db, "available_services"));
   const serviceSelect = document.getElementById("service");
   serviceSelect.innerHTML = `<option value="" disabled selected>Select a service</option>`;
+  
   servicesSnapshot.forEach((doc) => {
     const service = doc.data();
     serviceSelect.innerHTML += `<option value="${service.name}">${service.name}</option>`;
@@ -114,7 +124,7 @@ async function loadUserRequests(userId) {
       <div>
         <p><b>Service:</b> ${data.serviceName}</p>
         <p><b>Status:</b> ${data.status}</p>
-        <p><b>Payment:</b> ${data.paymentStatus}</p>
+        <p><b>Payment:</b> ${data.paymentStatus || "Pending"}</p>
         <p><b>Completion Time:</b> ${data.completionTime || "N/A"}</p>
         <p><b>Feedback:</b> ${data.feedback || "N/A"}</p>
       </div>
@@ -123,7 +133,7 @@ async function loadUserRequests(userId) {
 }
 
 //
-// ✅ 5. Auto-Assign Services Based on Location
+// ✅ 5. Auto-Assign Service Based on Location
 //
 async function autoAssignService(serviceDoc) {
   const serviceData = serviceDoc.data();
@@ -135,7 +145,7 @@ async function autoAssignService(serviceDoc) {
   let nearestProvider = null;
   providersSnapshot.forEach((providerDoc) => {
     const providerData = providerDoc.data();
-    if (providerData.location === userLocation) {
+    if (providerData.location === userLocation && providerData.isAvailable) {
       nearestProvider = providerDoc.id;
     }
   });
@@ -167,8 +177,8 @@ async function loadAdminDashboard(dashboard) {
           <p><b>Service:</b> ${data.serviceName}</p>
           <p><b>Status:</b> ${data.status}</p>
           <p><b>Requested By:</b> ${data.requestedBy}</p>
-          <p><b>Payment:</b> ${data.paymentStatus}</p>
-          <p><b>Feedback:</b> ${data.feedback}</p>
+          <p><b>Payment:</b> ${data.paymentStatus || "Unpaid"}</p>
+          <p><b>Feedback:</b> ${data.feedback || "N/A"}</p>
         </div>
       `;
     });
