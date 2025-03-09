@@ -6,7 +6,7 @@ import {
   ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
-// ✅ Fix 1: Dashboard Initialization
+// ✅ Fix 1: Check User Role
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("Not signed in. Redirecting to sign-in page.");
@@ -57,7 +57,7 @@ async function loadUserDashboard(userId, dashboard, userData) {
   loadUserRequests(userId);
 }
 
-// ✅ Fix 3: Load Services Options (Prevent Undefined Error)
+// ✅ Fix 3: Load Services Dropdown
 async function loadServicesOptions() {
   const serviceSelect = document.getElementById("service");
   serviceSelect.innerHTML = `<option value="" disabled selected>Loading services...</option>`;
@@ -71,7 +71,7 @@ async function loadServicesOptions() {
   });
 }
 
-// ✅ Fix 4: Request Service
+// ✅ Fix 4: Submit Service Request
 async function requestService(e, userId) {
   e.preventDefault();
   const service = document.getElementById("service").value;
@@ -92,7 +92,7 @@ async function requestService(e, userId) {
   loadUserRequests(userId);
 }
 
-// ✅ Fix 5: Load User Requests
+// ✅ Fix 5: Load User Service Requests
 async function loadUserRequests(userId) {
   const requestsDiv = document.getElementById("user-requests");
   requestsDiv.innerHTML = "";
@@ -130,7 +130,7 @@ async function loadProviderDashboard(providerId, dashboard, userData) {
   loadProviderRequests(providerId);
 }
 
-// ✅ Fix 7: Upload Government ID (Aadhaar/PAN)
+// ✅ Fix 7: Upload Aadhaar/PAN Card
 async function uploadGovernmentID(e, providerId) {
   e.preventDefault();
   const file = document.getElementById("gov-id").files[0];
