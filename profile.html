@@ -3,20 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Profile</title>
+  <title>Profile Page</title>
   <style>
     body { font-family: Arial, sans-serif; }
-    .container { max-width: 600px; margin: 20px auto; }
-    img { max-width: 120px; border-radius: 50%; }
-    input, textarea, button { display: block; width: 100%; margin-bottom: 10px; }
-    button { background-color: #4CAF50; color: white; border: none; padding: 10px; }
+    .container { max-width: 600px; margin: 20px auto; text-align: center; }
+    img { width: 120px; height: 120px; border-radius: 50%; }
+    input, textarea, button { display: block; width: 100%; margin-bottom: 15px; padding: 10px; }
+    button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #388E3C; }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h2>Your Profile</h2>
-  <img id="profile-image" src="default-avatar.png" alt="Profile Image">
+  <h2>User Profile</h2>
+  <img id="profile-image" src="default-avatar.png" alt="Profile Picture">
   <input type="file" id="upload-image" accept="image/*">
   
   <label>Name:</label>
@@ -39,19 +40,26 @@
   import { auth, db, storage } from "./firebase.js";
   import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
   import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 
-  let userId = new URLSearchParams(window.location.search).get("uid");
+  let userId = null;
   const profileImage = document.getElementById("profile-image");
   const uploadImage = document.getElementById("upload-image");
 
-  // ✅ Load User Profile
-  async function loadUserProfile() {
-    if (!userId) {
-      alert("User not found.");
-      window.location.href = "dashboard.html";
+  // ✅ Check if user is authenticated
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      alert("Not signed in. Redirecting to login.");
+      window.location.href = "signin.html";
       return;
     }
 
+    userId = user.uid;
+    loadUserProfile(userId);
+  });
+
+  // ✅ Load user profile data
+  async function loadUserProfile(userId) {
     const userDoc = await getDoc(doc(db, "users", userId));
     if (userDoc.exists()) {
       const data = userDoc.data();
@@ -64,12 +72,12 @@
         profileImage.src = data.profileImage;
       }
     } else {
-      alert("User not found in database.");
+      alert("User data not found.");
       window.location.href = "dashboard.html";
     }
   }
 
-  // ✅ Upload Profile Image
+  // ✅ Upload profile image
   uploadImage.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -84,10 +92,10 @@
       profileImage: imageUrl
     });
 
-    alert("Profile image updated.");
+    alert("Profile picture updated.");
   });
 
-  // ✅ Save Profile Data
+  // ✅ Save profile data
   async function saveProfile() {
     const name = document.getElementById("name").value;
     const phone = document.getElementById("phone").value;
@@ -100,15 +108,14 @@
     alert("Profile updated successfully.");
   }
 
-  // ✅ Logout
+  // ✅ Logout function
   function logout() {
-    auth.signOut().then(() => {
+    signOut(auth).then(() => {
       window.location.href = "signin.html";
+    }).catch((error) => {
+      alert("Failed to logout. Try again.");
     });
   }
-
-  // Load profile data on page load
-  loadUserProfile();
 </script>
 
 </body>
