@@ -6,7 +6,7 @@ import {
   ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
-// ✅ Fix 1: Check User Role
+// ✅ Handle Auth State
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("Not signed in. Redirecting to sign-in page.");
@@ -35,7 +35,7 @@ auth.onAuthStateChanged(async (user) => {
   }
 });
 
-// ✅ Fix 2: Load User Dashboard
+// ✅ Load User Dashboard
 async function loadUserDashboard(userId, dashboard, userData) {
   dashboard.innerHTML = `
     <h2>Welcome, ${userData.name}</h2>
@@ -53,11 +53,11 @@ async function loadUserDashboard(userId, dashboard, userData) {
   `;
 
   document.getElementById("request-service-form").addEventListener("submit", (e) => requestService(e, userId));
-  loadServicesOptions();
-  loadUserRequests(userId);
+  await loadServicesOptions();
+  await loadUserRequests(userId);
 }
 
-// ✅ Fix 3: Load Services Dropdown
+// ✅ Load Services in Dropdown
 async function loadServicesOptions() {
   const serviceSelect = document.getElementById("service");
   serviceSelect.innerHTML = `<option value="" disabled selected>Loading services...</option>`;
@@ -71,7 +71,7 @@ async function loadServicesOptions() {
   });
 }
 
-// ✅ Fix 4: Submit Service Request
+// ✅ Submit Service Request
 async function requestService(e, userId) {
   e.preventDefault();
   const service = document.getElementById("service").value;
@@ -89,10 +89,10 @@ async function requestService(e, userId) {
 
   await setDoc(doc(collection(db, "services")), newRequest);
   alert("Service request submitted.");
-  loadUserRequests(userId);
+  await loadUserRequests(userId);
 }
 
-// ✅ Fix 5: Load User Service Requests
+// ✅ Load User Service Requests
 async function loadUserRequests(userId) {
   const requestsDiv = document.getElementById("user-requests");
   requestsDiv.innerHTML = "";
@@ -113,7 +113,7 @@ async function loadUserRequests(userId) {
   });
 }
 
-// ✅ Fix 6: Load Service Provider Dashboard
+// ✅ Load Service Provider Dashboard
 async function loadProviderDashboard(providerId, dashboard, userData) {
   dashboard.innerHTML = `
     <h2>Welcome, ${userData.name}</h2>
@@ -127,10 +127,10 @@ async function loadProviderDashboard(providerId, dashboard, userData) {
   `;
 
   document.getElementById("upload-id-form").addEventListener("submit", (e) => uploadGovernmentID(e, providerId));
-  loadProviderRequests(providerId);
+  await loadProviderRequests(providerId);
 }
 
-// ✅ Fix 7: Upload Aadhaar/PAN Card
+// ✅ Upload Aadhaar/PAN Card
 async function uploadGovernmentID(e, providerId) {
   e.preventDefault();
   const file = document.getElementById("gov-id").files[0];
@@ -147,7 +147,7 @@ async function uploadGovernmentID(e, providerId) {
   alert("Government ID uploaded successfully!");
 }
 
-// ✅ Fix 8: Load Provider Requests
+// ✅ Load Provider Requests
 async function loadProviderRequests(providerId) {
   const requestsDiv = document.getElementById("provider-requests");
   requestsDiv.innerHTML = "";
@@ -166,7 +166,7 @@ async function loadProviderRequests(providerId) {
   });
 }
 
-// ✅ Fix 9: Load Admin Dashboard
+// ✅ Load Admin Dashboard
 async function loadAdminDashboard(dashboard) {
   dashboard.innerHTML = `
     <h2>All Service Requests</h2>
