@@ -3,19 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-   <link rel="stylesheet" href="assets/css/style.css">
-  <title>Profile</title>
-  <script type="module" src="./profile.js"></script>
+  <title>Profile - Fixeasy</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f5f5f5;
+    }
+    .profile-card {
+      background-color: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    .profile-card h2 {
+      margin-top: 0;
+    }
+    .profile-card p {
+      margin: 5px 0;
+    }
+    .download-btn {
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .download-btn:hover {
+      background-color: #0056b3;
+    }
+  </style>
 </head>
 <body>
-  <h1>Profile</h1>
-  <div id="profile-container">
-    <p><strong>Name:</strong> <span id="name"></span></p>
-    <p><strong>Email:</strong> <span id="email"></span></p>
-    <p><strong>Phone:</strong> <span id="phone"></span></p>
-    <p><strong>Address:</strong> <span id="address"></span></p>
-    <p><strong>Role:</strong> <span id="role"></span></p>
-    <p><strong>Gov ID:</strong> <span id="gov-id"></span></p>
-  </div>
+  <h1>User Profile</h1>
+  <div id="profile-container"></div>
+
+  <script type="module" src="profile.js"></script>
 </body>
 </html>
