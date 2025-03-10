@@ -1,44 +1,50 @@
 import { auth, db } from "./firebase.js";
-import {
-  doc,
-  getDoc,
-} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-// Load Profile Function
-export async function loadProfile() {
+// Function to fetch profile data
+async function loadProfile() {
   const urlParams = new URLSearchParams(window.location.search);
-  const userId = urlParams.get('user');
-  
-  if (!userId) {
-    alert("No profile to display.");
-    window.location.href = "dashboard.html";
+  const profileId = urlParams.get("id");
+
+  if (!profileId) {
+    document.getElementById("profile-container").innerHTML = `<p>No profile to display</p>`;
     return;
   }
 
-  const userDoc = await getDoc(doc(db, "users", userId));
-  if (!userDoc.exists()) {
-    alert("User not found.");
-    window.location.href = "dashboard.html";
-    return;
-  }
+  try {
+    const profileRef = doc(db, "users", profileId);
+    const profileSnap = await getDoc(profileRef);
 
-  const userData = userDoc.data();
-  displayProfile(userData);
+    if (profileSnap.exists()) {
+      const profileData = profileSnap.data();
+      displayProfile(profileData);
+    } else {
+      document.getElementById("profile-container").innerHTML = `<p>No profile found</p>`;
+    }
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    document.getElementById("profile-container").innerHTML = `<p>Error loading profile</p>`;
+  }
 }
 
-// Display Profile Function
-function displayProfile(data) {
-  const profileDiv = document.getElementById("profile");
-  profileDiv.innerHTML = `
-    <h2>${data.name}'s Profile</h2>
-    <p><strong>Email:</strong> ${data.email}</p>
-    <p><strong>Phone:</strong> ${data.phone || "Not Provided"}</p>
-    <p><strong>Address:</strong> ${data.address || "Not Provided"}</p>
-    <p><strong>Role:</strong> ${data.role}</p>
-    ${data.role === "service_provider" ? `<p><strong>Government ID:</strong> <a href="${data.govID}" target="_blank">View ID</a></p>` : ''}
-    <button onclick="window.location.href='dashboard.html'">Back to Dashboard</button>
+// Function to display profile data
+function displayProfile(profile) {
+  document.getElementById("profile-container").innerHTML = `
+    <h2>${profile.name}'s Profile</h2>
+    <p><strong>Email:</strong> ${profile.email}</p>
+    <p><strong>Phone:</strong> ${profile.phone || "N/A"}</p>
+    <p><strong>Address:</strong> ${profile.address || "N/A"}</p>
+    <p><strong>Role:</strong> ${profile.role}</p>
+    ${profile.govID ? `<p><strong>Government ID:</strong> <a href="${profile.govID}" target="_blank">View ID</a></p>` : ""}
   `;
 }
 
-// Auto-load Profile
-loadProfile();
+// Initialize profile page
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    loadProfile();
+  } else {
+    alert("You are not signed in. Redirecting...");
+    window.location.href = "signin.html";
+  }
+});
