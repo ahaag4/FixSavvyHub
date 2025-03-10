@@ -10,6 +10,7 @@ import {
   setDoc,  
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";  
 
+// Initialize Dashboard  
 export async function initializeDashboard() {  
   auth.onAuthStateChanged(async (user) => {  
     if (!user) {  
@@ -28,6 +29,7 @@ export async function initializeDashboard() {
     const role = userData.role;  
     const dashboard = document.getElementById("dashboard");  
 
+    // Load dashboard content based on user role  
     if (role === "user") {  
       loadUserDashboard(user.uid, dashboard, userData);  
     } else if (role === "service_provider") {  
@@ -40,11 +42,23 @@ export async function initializeDashboard() {
   });  
 }  
 
-// Load User Dashboard
+//  
+// 1. Load User Dashboard  
+//  
 async function loadUserDashboard(userId, dashboard, userData) {  
   const isProfileComplete = userData.address && userData.phone;  
 
   dashboard.innerHTML = `  
+    <section id="profile-completion" style="${isProfileComplete ? "display: none;" : ""}">  
+      <h2>Complete Your Profile</h2>  
+      <form id="user-profile-form">  
+        <label for="address">Address</label>  
+        <input type="text" id="address" required placeholder="Enter your address">  
+        <label for="phone">Phone</label>  
+        <input type="text" id="phone" required placeholder="Enter your phone number">  
+        <button type="submit">Save Profile</button>  
+      </form>  
+    </section>  
     <section id="request-service" style="${isProfileComplete ? "" : "display: none;"}">  
       <h2>Request a Service</h2>  
       <form id="request-service-form">  
@@ -53,7 +67,7 @@ async function loadUserDashboard(userId, dashboard, userData) {
           <option value="" disabled selected>Select a service</option>  
           <option value="Plumbing">Plumbing</option>  
           <option value="Electrician">Electrician</option>  
-          <option value="Cleaning">Cleaning</option>  
+          <option value="Carpenter">Carpenter</option>  
         </select>  
         <button type="submit">Request Service</button>  
       </form>  
@@ -62,8 +76,11 @@ async function loadUserDashboard(userId, dashboard, userData) {
     </section>  
   `;  
 
-  document.getElementById("request-service-form").addEventListener("submit", (e) => requestService(e, userId));  
-  loadUserRequests(userId);  
+  if (!isProfileComplete) {  
+    document.getElementById("user-profile-form").addEventListener("submit", (e) => saveUserProfile(e, userId));  
+  } else {  
+    loadUserRequests(userId);  
+  }  
 }  
 
 async function loadUserRequests(userId) {  
@@ -80,33 +97,37 @@ async function loadUserRequests(userId) {
 
   querySnapshot.forEach(async (doc) => {  
     const data = doc.data();  
+    const userName = await getUserName(data.requestedBy);  
     requestsDiv.innerHTML += `  
-      <p><b>Service:</b> ${data.serviceName} | <b>Status:</b> ${data.status}</p>  
+      <p><b>Service:</b> ${data.serviceName} |  
+      <b>Status:</b> ${data.status} |  
+      <b>Requested By:</b> ${userName}</p>  
     `;  
   });  
 }  
 
-async function requestService(event, userId) {  
-  event.preventDefault();  
-
-  const serviceName = document.getElementById("service").value;  
-  const newRequest = {  
-    serviceName: serviceName,  
-    requestedBy: userId,  
-    status: "Pending",  
-    assignedTo: "",  
-    location: "Delhi"  
-  };  
-
-  await setDoc(doc(collection(db, "services")), newRequest);  
-  alert("Service request submitted successfully!");  
-  loadUserRequests(userId);  
+async function getUserName(userId) {  
+  try {  
+    if (!userId) return "Unknown";  
+    const userRef = doc(db, "users", userId);  
+    const userDoc = await getDoc(userRef);  
+    if (userDoc.exists()) {  
+      return userDoc.data().name;  
+    } else {  
+      return "Unknown";  
+    }  
+  } catch (error) {  
+    console.error("Failed to fetch user name:", error);  
+    return "Unknown";  
+  }  
 }  
 
-// Load Admin Dashboard
+//  
+// 2. Load Admin Dashboard  
+//  
 async function loadAdminDashboard(dashboard) {  
   dashboard.innerHTML = `  
-    <h2>Manage Service Requests</h2>  
+    <h2>Manage Services</h2>  
     <div id="admin-requests"></div>  
   `;  
 
@@ -114,19 +135,49 @@ async function loadAdminDashboard(dashboard) {
   const querySnapshot = await getDocs(collection(db, "services"));  
 
   if (querySnapshot.empty) {  
-    adminRequestsDiv.innerHTML = `<p>No requests found.</p>`;  
+    adminRequestsDiv.innerHTML = `<p>No services found.</p>`;  
     return;  
   }  
 
   querySnapshot.forEach(async (doc) => {  
     const data = doc.data();  
-    const userDoc = await getDoc(doc(db, "users", data.requestedBy));  
-    const userName = userDoc.exists() ? userDoc.data().email : "Unknown";  
+    const userName = await getUserName(data.requestedBy);  
+    const providerName = await getUserName(data.assignedTo);  
 
     adminRequestsDiv.innerHTML += `  
+      <p><b>Service:</b> ${data.serviceName} |  
+      <b>Requested By:</b> ${userName} |  
+      <b>Assigned To:</b> ${providerName} |  
+      <b>Status:</b> ${data.status}</p>  
+    `;  
+  });  
+}  
+
+//  
+// 3. Load Provider Dashboard  
+//  
+async function loadProviderDashboard(userId, dashboard, userData) {  
+  dashboard.innerHTML = `  
+    <h2>Your Assigned Services</h2>  
+    <div id="provider-requests"></div>  
+  `;  
+
+  const providerRequestsDiv = document.getElementById("provider-requests");  
+  const q = query(collection(db, "services"), where("assignedTo", "==", userId));  
+  const querySnapshot = await getDocs(q);  
+
+  if (querySnapshot.empty) {  
+    providerRequestsDiv.innerHTML = `<p>No services assigned.</p>`;  
+    return;  
+  }  
+
+  querySnapshot.forEach(async (doc) => {  
+    const data = doc.data();  
+    const userName = await getUserName(data.requestedBy);  
+    providerRequestsDiv.innerHTML += `  
       <p><b>Service:</b> ${data.serviceName} |  
       <b>Requested By:</b> ${userName} |  
       <b>Status:</b> ${data.status}</p>  
     `;  
   });  
-}  
+}
