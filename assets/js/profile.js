@@ -1,13 +1,14 @@
 import { auth, db } from "./firebase.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-// Function to fetch profile data
+// Function to load profile data
 async function loadProfile() {
   const urlParams = new URLSearchParams(window.location.search);
   const profileId = urlParams.get("id");
 
   if (!profileId) {
-    document.getElementById("profile-container").innerHTML = `<p>No profile to display</p>`;
+    alert("Invalid profile ID");
+    window.location.href = "dashboard.html";
     return;
   }
 
@@ -19,27 +20,48 @@ async function loadProfile() {
       const profileData = profileSnap.data();
       displayProfile(profileData);
     } else {
-      document.getElementById("profile-container").innerHTML = `<p>No profile found</p>`;
+      alert("Profile not found");
+      window.location.href = "dashboard.html";
     }
   } catch (error) {
-    console.error("Error fetching profile:", error);
-    document.getElementById("profile-container").innerHTML = `<p>Error loading profile</p>`;
+    console.error("Error loading profile:", error);
+    alert("Error loading profile");
   }
 }
 
 // Function to display profile data
 function displayProfile(profile) {
-  document.getElementById("profile-container").innerHTML = `
-    <h2>${profile.name}'s Profile</h2>
-    <p><strong>Email:</strong> ${profile.email}</p>
-    <p><strong>Phone:</strong> ${profile.phone || "N/A"}</p>
-    <p><strong>Address:</strong> ${profile.address || "N/A"}</p>
-    <p><strong>Role:</strong> ${profile.role}</p>
-    ${profile.govID ? `<p><strong>Government ID:</strong> <a href="${profile.govID}" target="_blank">View ID</a></p>` : ""}
-  `;
+  document.getElementById("profile-name").textContent = profile.name;
+  document.getElementById("profile-email").textContent = profile.email;
+  document.getElementById("profile-phone").textContent = profile.phone || "N/A";
+  document.getElementById("profile-address").textContent = profile.address || "N/A";
+  document.getElementById("profile-role").textContent = profile.role;
+
+  // Show Government ID only if Admin
+  if (profile.role === "admin") {
+    document.getElementById("gov-id-link").href = profile.govID;
+    document.getElementById("gov-id-section").style.display = "block";
+  }
+
+  // Hide email for non-admins
+  if (profile.role !== "admin") {
+    document.getElementById("profile-email").style.display = "none";
+  }
 }
 
-// Initialize profile page
+// Function to download profile as PDF
+function downloadProfile() {
+  const content = document.querySelector(".profile-card").innerHTML;
+  const blob = new Blob([content], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Profile.html";
+  a.click();
+}
+
+// Load the profile when the user is authenticated
 auth.onAuthStateChanged((user) => {
   if (user) {
     loadProfile();
