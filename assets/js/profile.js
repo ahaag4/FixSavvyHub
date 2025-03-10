@@ -26,6 +26,7 @@ async function loadProfile() {
   } catch (error) {
     console.error("Error loading profile:", error);
     alert("Error loading profile");
+    window.location.href = "dashboard.html";
   }
 }
 
@@ -37,14 +38,14 @@ function displayProfile(profile) {
   document.getElementById("profile-address").textContent = profile.address || "N/A";
   document.getElementById("profile-role").textContent = profile.role;
 
-  // Show Government ID only if Admin
-  if (profile.role === "admin") {
+  // Show Government ID only if Admin or Owner
+  if (profile.role === "admin" || auth.currentUser.uid === profile.uid) {
     document.getElementById("gov-id-link").href = profile.govID;
     document.getElementById("gov-id-section").style.display = "block";
   }
 
   // Hide email for non-admins
-  if (profile.role !== "admin") {
+  if (auth.currentUser.uid !== profile.uid && auth.currentUser.role !== "admin") {
     document.getElementById("profile-email").style.display = "none";
   }
 }
@@ -61,8 +62,18 @@ function downloadProfile() {
   a.click();
 }
 
-// Load the profile when the user is authenticated
+// ✅ Authentication Logic
 auth.onAuthStateChanged((user) => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const profileId = urlParams.get("id");
+
+  // Admin can access profiles without login
+  if (profileId && !user) {
+    loadProfile();
+    return;
+  }
+
+  // Users or Providers must login to view profile
   if (user) {
     loadProfile();
   } else {
