@@ -7,39 +7,78 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
       background-color: #f5f5f5;
+      margin: 0;
+      padding: 20px;
     }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+    }
+
     .profile-card {
       background-color: #fff;
       border-radius: 10px;
       padding: 20px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
       margin-bottom: 20px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
+
     .profile-card h2 {
-      margin-top: 0;
+      margin: 0;
+      color: #333;
     }
+
     .profile-card p {
-      margin: 5px 0;
+      margin: 8px 0;
+      color: #555;
     }
+
+    .profile-card a {
+      text-decoration: none;
+      color: #007bff;
+    }
+
     .download-btn {
       background-color: #007bff;
       color: #fff;
       border: none;
-      padding: 10px 15px;
+      padding: 10px 20px;
       border-radius: 5px;
       cursor: pointer;
       text-decoration: none;
+      font-size: 16px;
     }
+
     .download-btn:hover {
       background-color: #0056b3;
+    }
+
+    .back-btn {
+      display: block;
+      margin-bottom: 20px;
+      color: #007bff;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
-  <h1>User Profile</h1>
-  <div id="profile-container"></div>
+  <div class="container">
+    <a class="back-btn" href="dashboard.html">← Back to Dashboard</a>
+
+    <div class="profile-card">
+      <h2 id="profile-name">Loading...</h2>
+      <p><strong>Email:</strong> <span id="profile-email"></span></p>
+      <p><strong>Phone:</strong> <span id="profile-phone"></span></p>
+      <p><strong>Address:</strong> <span id="profile-address"></span></p>
+      <p><strong>Role:</strong> <span id="profile-role"></span></p>
+      <p id="gov-id-section" style="display:none;">
+        <strong>Government ID:</strong> <a id="gov-id-link" href="#" target="_blank">View ID</a>
+      </p>
+      <button class="download-btn" onclick="downloadProfile()">Download Profile as PDF</button>
+    </div>
+  </div>
 
   <script type="module" src="/assets/js/profile.js"></script>
 </body>
