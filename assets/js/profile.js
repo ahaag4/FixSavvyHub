@@ -4,40 +4,41 @@ import {
   getDoc,
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-document.addEventListener("DOMContentLoaded", async () => {
+// Load Profile Function
+export async function loadProfile() {
   const urlParams = new URLSearchParams(window.location.search);
-  const userId = urlParams.get("user");
-  const profileContainer = document.getElementById("profile-container");
-
+  const userId = urlParams.get('user');
+  
   if (!userId) {
-    profileContainer.innerHTML = `<p>User ID not provided.</p>`;
+    alert("No profile to display.");
+    window.location.href = "dashboard.html";
     return;
   }
 
   const userDoc = await getDoc(doc(db, "users", userId));
   if (!userDoc.exists()) {
-    profileContainer.innerHTML = `<p>User not found.</p>`;
+    alert("User not found.");
+    window.location.href = "dashboard.html";
     return;
   }
 
   const userData = userDoc.data();
-  renderProfile(userData);
-});
-
-function renderProfile(userData) {
-  const profileContainer = document.getElementById("profile-container");
-
-  const profileHTML = `
-    <div class="profile-card">
-      <h2>${userData.name}</h2>
-      <p><strong>Email:</strong> ${userData.email}</p>
-      <p><strong>Phone:</strong> ${userData.phone || 'N/A'}</p>
-      <p><strong>Address:</strong> ${userData.address || 'N/A'}</p>
-      <p><strong>Role:</strong> ${userData.role}</p>
-      <p><strong>Location:</strong> ${userData.location || 'N/A'}</p>
-      ${userData.govID ? `<a class="download-btn" href="${userData.govID}" target="_blank">Download Gov ID</a>` : ''}
-    </div>
-  `;
-
-  profileContainer.innerHTML = profileHTML;
+  displayProfile(userData);
 }
+
+// Display Profile Function
+function displayProfile(data) {
+  const profileDiv = document.getElementById("profile");
+  profileDiv.innerHTML = `
+    <h2>${data.name}'s Profile</h2>
+    <p><strong>Email:</strong> ${data.email}</p>
+    <p><strong>Phone:</strong> ${data.phone || "Not Provided"}</p>
+    <p><strong>Address:</strong> ${data.address || "Not Provided"}</p>
+    <p><strong>Role:</strong> ${data.role}</p>
+    ${data.role === "service_provider" ? `<p><strong>Government ID:</strong> <a href="${data.govID}" target="_blank">View ID</a></p>` : ''}
+    <button onclick="window.location.href='dashboard.html'">Back to Dashboard</button>
+  `;
+}
+
+// Auto-load Profile
+loadProfile();
