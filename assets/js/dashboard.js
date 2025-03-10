@@ -100,6 +100,7 @@ async function loadUserRequests(userId) {
     requestsDiv.innerHTML += `
       <p><b>Service:</b> ${data.serviceName} | 
       <b>Status:</b> ${data.status} | 
+      <a href="profile.html?id=${data.assignedTo}" target="_blank">View Service Provider</a> | 
       <button onclick="cancelService('${docSnap.id}')">Cancel</button></p>
     `;
   });
@@ -125,13 +126,11 @@ async function loadAdminDashboard(dashboard) {
 
   querySnapshot.forEach(async (docSnap) => {
     const data = docSnap.data();
-    const userEmail = await getUserEmail(data.requestedBy);
-    const providerEmail = await getUserEmail(data.assignedTo);
 
     requestsDiv.innerHTML += `
       <p><b>Service:</b> ${data.serviceName} | 
-      <b>Requested By:</b> ${userEmail} | 
-      <b>Assigned To:</b> ${providerEmail} | 
+      <a href="profile.html?id=${data.requestedBy}" target="_blank">View User</a> | 
+      <a href="profile.html?id=${data.assignedTo}" target="_blank">View Provider</a> | 
       <b>Status:</b> ${data.status}</p>
     `;
   });
@@ -152,11 +151,10 @@ async function loadProviderDashboard(userId, dashboard) {
 
   querySnapshot.forEach(async (docSnap) => {
     const data = docSnap.data();
-    const userEmail = await getUserEmail(data.requestedBy);
 
     requestsDiv.innerHTML += `
       <p><b>Service:</b> ${data.serviceName} | 
-      <b>Requested By:</b> ${userEmail} | 
+      <a href="profile.html?id=${data.requestedBy}" target="_blank">View User</a> | 
       <b>Status:</b> ${data.status} | 
       <button onclick="markCompleted('${docSnap.id}')">Mark Completed</button></p>
     `;
@@ -170,7 +168,7 @@ window.markCompleted = async function (serviceId) {
 };
 
 // =====================
-// ✅ Helper Functions
+// ✅ Helper Function (Profile Link)
 // =====================
 async function getUserEmail(userId) {
   if (!userId) return "Not Assigned";
