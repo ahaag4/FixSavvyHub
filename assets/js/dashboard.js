@@ -19,8 +19,7 @@ export async function initializeDashboard() {
       return;  
     }  
 
-    const userRef = doc(db, "users", user.uid);  
-    const userDoc = await getDoc(userRef);  
+    const userDoc = await getDoc(doc(db, "users", user.uid));  
     if (!userDoc.exists()) {  
       alert("User data not found!");  
       return;  
@@ -43,9 +42,9 @@ export async function initializeDashboard() {
   });  
 }  
 
-// =======================  
+//  
 // 1. Load User Dashboard  
-// =======================  
+//  
 async function loadUserDashboard(userId, dashboard, userData) {  
   const isProfileComplete = userData.address && userData.phone;  
 
@@ -66,7 +65,9 @@ async function loadUserDashboard(userId, dashboard, userData) {
         <label for="service">Service</label>  
         <select id="service" required>  
           <option value="" disabled selected>Select a service</option>  
-          ${services.map(service => `<option value="${service}">${service}</option>`).join("")}  
+          <option value="Plumbing">Plumbing</option>  
+          <option value="Electrician">Electrician</option>  
+          <option value="Carpenter">Carpenter</option>  
         </select>  
         <button type="submit">Request Service</button>  
       </form>  
@@ -78,7 +79,6 @@ async function loadUserDashboard(userId, dashboard, userData) {
   if (!isProfileComplete) {  
     document.getElementById("user-profile-form").addEventListener("submit", (e) => saveUserProfile(e, userId));  
   } else {  
-    loadServicesOptions();  
     loadUserRequests(userId);  
   }  
 }  
@@ -95,21 +95,36 @@ async function loadUserRequests(userId) {
     return;  
   }  
 
-  querySnapshot.forEach(async (docData) => {  
-    const data = docData.data();  
-    const userRef = doc(db, "users", data.requestedBy);  
-    const userDoc = await getDoc(userRef);  
-    const userName = userDoc.exists() ? userDoc.data().name : "Unknown";  
-
+  querySnapshot.forEach(async (doc) => {  
+    const data = doc.data();  
+    const userName = await getUserName(data.requestedBy);  
     requestsDiv.innerHTML += `  
-      <p><b>Service:</b> ${data.serviceName} | <b>Requested By:</b> ${userName} | <b>Status:</b> ${data.status}</p>  
+      <p><b>Service:</b> ${data.serviceName} |  
+      <b>Status:</b> ${data.status} |  
+      <b>Requested By:</b> ${userName}</p>  
     `;  
   });  
 }  
 
-// =======================  
+async function getUserName(userId) {  
+  try {  
+    if (!userId) return "Unknown";  
+    const userRef = doc(db, "users", userId);  
+    const userDoc = await getDoc(userRef);  
+    if (userDoc.exists()) {  
+      return userDoc.data().name;  
+    } else {  
+      return "Unknown";  
+    }  
+  } catch (error) {  
+    console.error("Failed to fetch user name:", error);  
+    return "Unknown";  
+  }  
+}  
+
+//  
 // 2. Load Admin Dashboard  
-// =======================  
+//  
 async function loadAdminDashboard(dashboard) {  
   dashboard.innerHTML = `  
     <h2>Manage Services</h2>  
@@ -124,49 +139,45 @@ async function loadAdminDashboard(dashboard) {
     return;  
   }  
 
-  querySnapshot.forEach(async (docData) => {  
-    const data = docData.data();  
-    const userRef = doc(db, "users", data.requestedBy);  
-    const userDoc = await getDoc(userRef);  
-    const userName = userDoc.exists() ? userDoc.data().name : "Unknown";  
-
-    const providerRef = doc(db, "users", data.assignedTo);  
-    const providerDoc = await getDoc(providerRef);  
-    const providerName = providerDoc.exists() ? providerDoc.data().name : "Unassigned";  
+  querySnapshot.forEach(async (doc) => {  
+    const data = doc.data();  
+    const userName = await getUserName(data.requestedBy);  
+    const providerName = await getUserName(data.assignedTo);  
 
     adminRequestsDiv.innerHTML += `  
-      <p><b>Service:</b> ${data.serviceName} | <b>Requested By:</b> ${userName} |   
-      <b>Assigned To:</b> ${providerName} | <b>Status:</b> ${data.status}</p>  
+      <p><b>Service:</b> ${data.serviceName} |  
+      <b>Requested By:</b> ${userName} |  
+      <b>Assigned To:</b> ${providerName} |  
+      <b>Status:</b> ${data.status}</p>  
     `;  
   });  
 }  
 
-// =======================  
+//  
 // 3. Load Provider Dashboard  
-// =======================  
+//  
 async function loadProviderDashboard(userId, dashboard, userData) {  
   dashboard.innerHTML = `  
-    <h2>Assigned Services</h2>  
+    <h2>Your Assigned Services</h2>  
     <div id="provider-requests"></div>  
   `;  
 
-  const requestsDiv = document.getElementById("provider-requests");  
+  const providerRequestsDiv = document.getElementById("provider-requests");  
   const q = query(collection(db, "services"), where("assignedTo", "==", userId));  
   const querySnapshot = await getDocs(q);  
 
   if (querySnapshot.empty) {  
-    requestsDiv.innerHTML = `<p>No assigned services found.</p>`;  
+    providerRequestsDiv.innerHTML = `<p>No services assigned.</p>`;  
     return;  
   }  
 
-  querySnapshot.forEach(async (docData) => {  
-    const data = docData.data();  
-    const userRef = doc(db, "users", data.requestedBy);  
-    const userDoc = await getDoc(userRef);  
-    const userName = userDoc.exists() ? userDoc.data().name : "Unknown";  
-
-    requestsDiv.innerHTML += `  
-      <p><b>Service:</b> ${data.serviceName} | <b>Requested By:</b> ${userName} | <b>Status:</b> ${data.status}</p>  
+  querySnapshot.forEach(async (doc) => {  
+    const data = doc.data();  
+    const userName = await getUserName(data.requestedBy);  
+    providerRequestsDiv.innerHTML += `  
+      <p><b>Service:</b> ${data.serviceName} |  
+      <b>Requested By:</b> ${userName} |  
+      <b>Status:</b> ${data.status}</p>  
     `;  
   });  
-                        }
+}
