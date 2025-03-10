@@ -38,15 +38,22 @@ function displayProfile(profile) {
   document.getElementById("profile-address").textContent = profile.address || "N/A";
   document.getElementById("profile-role").textContent = profile.role;
 
-  // Show Government ID only if Admin or Owner
-  if (profile.role === "admin" || auth.currentUser.uid === profile.uid) {
+  // ✅ Always Show Government ID if Admin
+  if (auth.currentUser && auth.currentUser.email === "admin@gmail.com") {
     document.getElementById("gov-id-link").href = profile.govID;
     document.getElementById("gov-id-section").style.display = "block";
+    document.getElementById("profile-email").style.display = "block";
   }
 
-  // Hide email for non-admins
-  if (auth.currentUser.uid !== profile.uid && auth.currentUser.role !== "admin") {
+  // 🚫 Hide email for non-admins
+  if (auth.currentUser && auth.currentUser.email !== "admin@gmail.com" && auth.currentUser.uid !== profile.uid) {
     document.getElementById("profile-email").style.display = "none";
+  }
+
+  // ✅ Show Government ID only if it's their own or Admin
+  if (auth.currentUser && (auth.currentUser.email === "admin@gmail.com" || auth.currentUser.uid === profile.uid)) {
+    document.getElementById("gov-id-link").href = profile.govID;
+    document.getElementById("gov-id-section").style.display = "block";
   }
 }
 
@@ -67,13 +74,13 @@ auth.onAuthStateChanged((user) => {
   const urlParams = new URLSearchParams(window.location.search);
   const profileId = urlParams.get("id");
 
-  // Admin can access profiles without login
-  if (profileId && !user) {
+  // ✅ If Admin, allow access without login
+  if (profileId && !user && window.location.href.includes("admin@gmail.com")) {
     loadProfile();
     return;
   }
 
-  // Users or Providers must login to view profile
+  // ✅ If User, enforce login
   if (user) {
     loadProfile();
   } else {
