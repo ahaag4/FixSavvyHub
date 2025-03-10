@@ -21,20 +21,19 @@ export async function initializeDashboard() {
   
     const userDoc = await getDoc(doc(db, "users", user.uid));  
     if (!userDoc.exists()) {  
-      alert("User  data not found!");  
+      alert("User data not found!");  
       return;  
     }  
   
     const userData = userDoc.data();  
     const role = userData.role;  
     const dashboard = document.getElementById("dashboard");  
-    const userName = userData.name; // Fetch user name from userData
-
+  
     // Load dashboard content based on user role  
     if (role === "user") {  
-      loadUser Dashboard(userName, dashboard, userData); // Pass userName instead of userId
+      loadUserDashboard(user.uid, dashboard, userData);  
     } else if (role === "service_provider") {  
-      loadProviderDashboard(userName, dashboard, userData); // Pass userName instead of providerId
+      loadProviderDashboard(user.uid, dashboard, userData);  
     } else if (role === "admin") {  
       loadAdminDashboard(dashboard);  
     } else {  
@@ -46,11 +45,10 @@ export async function initializeDashboard() {
 //  
 // 1. Load User Dashboard  
 //  
-async function loadUser Dashboard(userName, dashboard, userData) {  
+async function loadUserDashboard(userId, dashboard, userData) {  
   const isProfileComplete = userData.address && userData.phone;  
   
   dashboard.innerHTML = `  
-    <h2>Welcome, ${userName}</h2>  <!-- Display user name -->
     <section id="profile-completion" style="${isProfileComplete ? "display: none;" : ""}">  
       <h2>Complete Your Profile</h2>  
       <form id="user-profile-form">  
@@ -77,42 +75,14 @@ async function loadUser Dashboard(userName, dashboard, userData) {
   `;  
   
   if (!isProfileComplete) {  
-    document.getElementById("user-profile-form").addEventListener("submit", (e) => saveUser Profile(e, userData.uid));  
+    document.getElementById("user-profile-form").addEventListener("submit", (e) => saveUserProfile(e, userId));  
   } else {  
     loadServicesOptions();  
-    loadUser Requests(userData.uid);  
+    loadUserRequests(userId);  
   }  
 }  
   
-async function saveUser Profile(e, userId) {  
-  e.preventDefault();  
-  const address = document.getElementById("address").value;  
-  const phone = document.getElementById("phone").value;  
-  
-  if (!address || !phone) {  
-    alert("Please complete all fields.");  
-    return;  
-  }  
-  
-  await updateDoc(doc(db, "users", userId), { address, phone });  
-  alert("Profile updated successfully!");  
-  document.getElementById("profile-completion").style.display = "none";  
-  document.getElementById("request-service").style.display = "";  
-  loadServicesOptions();  
-  loadUser Requests(userId);  
-}  
-  
-async function loadServicesOptions() {  
-  const servicesSnapshot = await getDocs(collection(db, "available_services"));  
-  const serviceSelect = document.getElementById("service");  
-  serviceSelect.innerHTML = `<option value="" disabled selected>Select a service</option>`;  
-  servicesSnapshot.forEach((doc) => {  
-    const service = doc.data();  
-    serviceSelect.innerHTML += `<option value="${service.name}">${service.name}</option>`;  
-  });  
-}  
-  
-async function loadUser Requests(userId) {  
+async function loadUserRequests(userId) {  
   const requestsDiv = document.getElementById("user-requests");  
   requestsDiv.innerHTML = "";  
   
@@ -124,92 +94,19 @@ async function loadUser Requests(userId) {
     return;  
   }  
   
-  querySnapshot.forEach((doc) => {  
+  querySnapshot.forEach(async (doc) => {  
     const data = doc.data();  
+    const userDoc = await getDoc(doc(db, "users", data.requestedBy));  
+    const userName = userDoc.exists() ? userDoc.data().name : "Unknown";  
+  
     requestsDiv.innerHTML += `  
-      <p><b>Service:</b> ${data.serviceName} | <b>Status:</b> ${data.status}</p>  
+      <p><b>Service:</b> ${data.serviceName} | <b>Requested By:</b> ${userName} | <b>Status:</b> ${data.status}</p>  
     `;  
   });  
 }  
   
 //  
-// 2. Load Service Provider Dashboard  
-//  
-async function loadProviderDashboard(providerName, dashboard, userData) {  
-  const isProfileComplete = userData.address && userData.phone && userData.govID;  
-  
-  dashboard.innerHTML = `  
-    <h2>Welcome, ${providerName}</h2>  <!-- Display provider name -->
-    <section id="profile-completion" style="${isProfileComplete ? "display: none;" : ""}">  
-      <h2>Complete Your Profile</h2>  
-      <form id="provider-profile-form">  
-        <label for="address">Address</label>  
-        <input type="text" id="address" required placeholder="Enter your address">  
-        <label for="phone">Phone</label>  
-        <input type="text" id="phone" required placeholder="Enter your phone number">  
-        <label for="gov-id">Upload Government ID</label>  
-        <input type="file" id="gov-id" required>  
-        <button type="submit">Save Profile</button>  
-      </form>  
-    </section>  
-    <section id="assigned-requests" style="${isProfileComplete ? "" : "display: none;"}">  
-      <h2>Assigned Services</h2>  
-      <div id="provider-requests"></div>  
-    </section>  
-  `;  
-  
-  if (!isProfileComplete) {  
-    document.getElementById("provider-profile-form").addEventListener("submit", (e) => saveProviderProfile(e, userData.uid));  
-  } else {  
-    loadProviderRequests(userData.uid);  
-  }  
-}  
-  
-async function saveProviderProfile(e, providerId) {  
-  e.preventDefault();  
-  const address = document.getElementById("address").value;  
-  const phone = document.getElementById("phone").value;  
-  const govID = document.getElementById("gov-id").files[0];  
-  
-  if (!address || !phone || !govID) {  
-    alert("Please complete all fields.");  
-    return;  
-  }  
-  
-  await updateDoc(doc(db, "users", providerId), {  
-    address,  
-    phone,  
-    govID: govID.name,  
-  });  
-  
-  alert("Profile updated successfully!");  
-  document.getElementById("profile-completion").style.display = "none";  
-  document.getElementById("assigned-requests").style.display = "";  
-  loadProviderRequests(providerId);  
-}  
-  
-async function loadProviderRequests(providerId) {  
-  const requestsDiv = document.getElementById("provider-requests");  
-  requestsDiv.innerHTML = "";  
-  
-  const q = query(collection(db, "services"), where("assignedTo", "==", providerId));  
-  const querySnapshot = await getDocs(q);  
-  
-  if (querySnapshot.empty) {  
-    requestsDiv.innerHTML = `<p>No assigned services.</p>`;  
-    return;  
-  }  
-  
-  querySnapshot.forEach((doc) => {  
-    const data = doc.data();  
-    requestsDiv.innerHTML += `  
-      <p><b>Service:</b> ${data.serviceName} | <b>Status:</b> ${data.status}</p>  
-    `;  
-  });  
-}  
-  
-//  
-// 3. Load Admin Dashboard  
+// 2. Load Admin Dashboard  
 //  
 async function loadAdminDashboard(dashboard) {  
   dashboard.innerHTML = `  
@@ -225,11 +122,16 @@ async function loadAdminDashboard(dashboard) {
     return;  
   }  
   
-  querySnapshot.forEach((doc) => {  
+  querySnapshot.forEach(async (doc) => {  
     const data = doc.data();  
+    const userDoc = await getDoc(doc(db, "users", data.requestedBy));  
+    const userName = userDoc.exists() ? userDoc.data().name : "Unknown";  
+    const providerDoc = await getDoc(doc(db, "users", data.assignedTo));  
+    const providerName = providerDoc.exists() ? providerDoc.data().name : "Unassigned";  
+  
     adminRequestsDiv.innerHTML += `  
-      <p><b>Service:</b> ${data.serviceName} | <b>Requested By:</b> ${data.requestedBy} |   
-      <b>Assigned To:</b> ${data.assignedTo || "Unassigned"} | <b>Status:</b> ${data.status}</p>  
+      <p><b>Service:</b> ${data.serviceName} | <b>Requested By:</b> ${userName} |   
+      <b>Assigned To:</b> ${providerName} | <b>Status:</b> ${data.status}</p>  
     `;  
   });  
-}  
+      }
