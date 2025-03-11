@@ -1,6 +1,6 @@
-import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.17.2/firebase-auth.js';
-import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore.js';
 import { auth, db } from './firebase.js';
+import { signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.17.2/firebase-auth.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore.js';
 
 const signinForm = document.getElementById('signin-form');
 
@@ -16,7 +16,6 @@ signinForm.addEventListener('submit', async (e) => {
     const user = userCredential.user;
 
     // ✅ Fetch user role from Firestore
-    const db = getFirestore();  // Ensure Firestore instance is correct
     const userDocRef = doc(db, "users", user.uid);
     const userDocSnap = await getDoc(userDocRef);
 
