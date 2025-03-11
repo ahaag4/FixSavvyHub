@@ -4,41 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Service Provider Dashboard - Fixeasy</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background-color: #f5f5f5;
-    }
-    .section {
-      background-color: #fff;
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    }
-    h2 {
-      margin-top: 0;
-    }
-    .hidden {
-      display: none;
-    }
-    button {
-      padding: 10px 15px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    a {
-      text-decoration: none;
-      color: #007bff;
-    }
-  </style>
+  <link rel="stylesheet" href="/assets/css/serviceProvider.css">
 </head>
 <body>
 
@@ -72,6 +38,14 @@
 <section class="section hidden" id="section-4">
   <h2>Your Profile</h2>
   <a href="#" id="view-profile">View My Profile</a>
+</section>
+
+<section class="section hidden" id="section-5">
+  <h2>Service Summary</h2>
+  <p><b>Total Earnings:</b> ₹<span id="total-earnings">0</span></p>
+  <p><b>Completed Services:</b> <span id="completed-services">0</span></p>
+  <p><b>Cancelled Services:</b> <span id="cancelled-services">0</span></p>
+  <p><b>Average Rating:</b> <span id="average-rating">0.0</span></p>
 </section>
 
 <script type="module" src="/assets/js/serviceProvider.js"></script>
