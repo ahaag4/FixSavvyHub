@@ -53,9 +53,11 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   const address = document.getElementById("address").value;
   const govIDFile = document.getElementById("gov-id").files[0];
 
+  const govIDURL = URL.createObjectURL(govIDFile);
+
   await setDoc(doc(db, "users", userId), {
     username, phone, address,
-    govID: URL.createObjectURL(govIDFile),
+    govID: govIDURL,
     role: "service_provider"
   }, { merge: true });
 
@@ -66,21 +68,26 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
 // ✅ Section 2: Load Assigned Services
 async function loadAssignedServices() {
   const q = query(collection(db, "services"), where("assignedTo", "==", userId));
-  const services = await getDocs(q);
+  const querySnapshot = await getDocs(q);
 
   const container = document.getElementById("assigned-service");
   container.innerHTML = "";
 
-  services.forEach(async (docSnap) => {
+  querySnapshot.forEach(async (docSnap) => {
     const data = docSnap.data();
     const userRef = await getDoc(doc(db, "users", data.requestedBy));
     const user = userRef.data();
 
     container.innerHTML += `
-      <p><b>Service:</b> ${data.serviceName}</p>
-      <p><b>Requested By:</b> ${user.username}</p>
-      <a href="profile.html?id=${userRef.id}">View User Profile</a>
-      <button onclick="markCompleted('${docSnap.id}')">Mark Completed</button>
+      <div>
+        <p><b>Service:</b> ${data.serviceName}</p>
+        <p><b>Requested By:</b> ${user.username}</p>
+        <p><b>Phone:</b> ${user.phone}</p>
+        <p><b>Address:</b> ${user.address}</p>
+        <button class="complete" onclick="markCompleted('${docSnap.id}')">Mark Completed</button>
+        <a href="profile.html?id=${userRef.id}" target="_blank">View User Profile</a>
+      </div>
+      <hr>
     `;
   });
 }
@@ -88,8 +95,6 @@ async function loadAssignedServices() {
 // ✅ Section 3: Mark Service Completed
 window.markCompleted = async (serviceId) => {
   await updateDoc(doc(db, "services", serviceId), { status: "Completed" });
-  completedServices++;
-  totalEarnings += 300;
   alert("Service marked as completed!");
   location.reload();
 };
@@ -97,27 +102,54 @@ window.markCompleted = async (serviceId) => {
 // ✅ Section 4: Load Service History
 async function loadServiceHistory() {
   const q = query(collection(db, "services"), where("assignedTo", "==", userId));
-  const services = await getDocs(q);
+  const querySnapshot = await getDocs(q);
 
   const container = document.getElementById("service-history");
   container.innerHTML = "";
 
-  services.forEach((docSnap) => {
+  querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
 
     container.innerHTML += `
-      <p><b>Service:</b> ${data.serviceName}</p>
-      <p><b>Status:</b> ${data.status}</p>
+      <div>
+        <p><b>Service:</b> ${data.serviceName}</p>
+        <p><b>Status:</b> ${data.status}</p>
+        <p><b>Feedback:</b> ${data.feedback || "No Feedback"}</p>
+        <p><b>Rating:</b> ${data.rating || "Not Rated Yet"}</p>
+      </div>
+      <hr>
     `;
   });
 }
 
 // ✅ Section 5: Load Summary
 async function loadSummary() {
-  document.getElementById("total-earnings").innerText = totalEarnings;
+  const q = query(collection(db, "services"), where("assignedTo", "==", userId));
+  const querySnapshot = await getDocs(q);
+
+  querySnapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    if (data.status === "Completed") {
+      completedServices++;
+      totalEarnings += 300;
+      if (data.rating) {
+        totalRatings += parseInt(data.rating);
+        totalFeedback++;
+      }
+    }
+    if (data.status === "Cancelled") {
+      cancelledServices++;
+    }
+  });
+
+  const avgRating = totalFeedback > 0 ? (totalRatings / totalFeedback).toFixed(1) : "N/A";
+
+  document.getElementById("total-earnings").innerText = `₹${totalEarnings}`;
   document.getElementById("completed-services").innerText = completedServices;
   document.getElementById("cancelled-services").innerText = cancelledServices;
+  document.getElementById("average-rating").innerText = avgRating;
 }
 
-// ✅ View Profile
-document.getElementById("view-profile").href = `profile.html`;
+// ✅ Section 6: View Profile
+document.getElementById("view-profile").href = `profile.html?id=${userId}`;
+  
