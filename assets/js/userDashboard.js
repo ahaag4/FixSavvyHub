@@ -94,27 +94,41 @@ async function autoAssignServiceProvider() {
 // ==========================
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
-  const services = await getDocs(q);
+  const querySnapshot = await getDocs(q);
 
   const serviceContainer = document.getElementById("assigned-service");
   serviceContainer.innerHTML = "";
 
-  services.forEach(async (doc) => {
-    const data = doc.data();
-    const providerProfile = await getDoc(doc(db, "users", data.assignedTo));
+  if (querySnapshot.empty) {
+    serviceContainer.innerHTML = `<p>No services requested yet.</p>`;
+    return;
+  }
+
+  querySnapshot.forEach(async (docSnap) => {
+    const data = docSnap.data();
+    let providerProfile = "Not Assigned";
+
+    if (data.assignedTo) {
+      const providerDoc = await getDoc(doc(db, "users", data.assignedTo));
+      if (providerDoc.exists()) {
+        providerProfile = providerDoc.data().username;
+      }
+    }
 
     serviceContainer.innerHTML += `
-      <p><b>Service:</b> ${data.serviceName}</p>
-      <p><b>Status:</b> ${data.status}</p>
-      <p><b>Service Provider:</b> ${providerProfile.data().username}</p>
-      <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
-      <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
-      <button onclick="cancelService('${doc.id}')">Cancel Service</button>
+      <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+        <p><b>Service:</b> ${data.serviceName}</p>
+        <p><b>Status:</b> ${data.status}</p>
+        <p><b>Service Provider:</b> ${providerProfile}</p>
+        <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
+        <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
+        <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
+      </div>
     `;
 
     if (data.status === "Completed") {
       document.getElementById("section-4").classList.remove("hidden");
-      latestServiceId = doc.id;
+      latestServiceId = docSnap.id;
     }
   });
 }
@@ -143,4 +157,4 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   alert("Feedback Submitted!");
   location.reload();
 });
-      
+  
