@@ -16,6 +16,7 @@ signinForm.addEventListener('submit', async (e) => {
     const user = userCredential.user;
 
     // ✅ Fetch user role from Firestore
+    const db = getFirestore();  // Ensure Firestore instance is correct
     const userDocRef = doc(db, "users", user.uid);
     const userDocSnap = await getDoc(userDocRef);
 
