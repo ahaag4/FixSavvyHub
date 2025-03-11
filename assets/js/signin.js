@@ -10,19 +10,10 @@ signinForm.addEventListener('submit', async (e) => {
   const password = signinForm['password'].value;
 
   try {
-    // Sign in with email and password
+    // Sign in without email verification check
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-
-    // ✅ Fetch fresh user data to ensure accurate email verification status
-    await user.reload();
-
-    if (!user.emailVerified) {
-      alert('Please verify your email address before signing in.');
-      return;
-    }
-
-    // ✅ Successful login - Redirect to dashboard
+    
+    // Successful sign-in
     alert('Sign-in successful!');
     window.location.href = 'dashboard.html';
   } catch (error) {
