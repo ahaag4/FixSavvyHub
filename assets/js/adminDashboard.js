@@ -72,7 +72,7 @@ async function loadAllProviders() {
     const data = doc.data();
     providersDiv.innerHTML += `
       <div>
-        <p><b>UserID:</b> ${data.requestedBy}</p>
+        <p><b>UserID:</b> ${data.providerID}</p>
         <p><b>Name:</b> ${data.username}</p>
         <p><b>Phone:</b> ${data.phone}</p>
         <p><b>Gov ID:</b> <a href="${data.govID}" target="_blank">View ID</a></p>
