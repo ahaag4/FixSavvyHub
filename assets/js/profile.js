@@ -1,15 +1,20 @@
 import { auth, db } from "./firebase.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-// Function to load profile data
+// ✅ Function to Load Profile Data
 async function loadProfile() {
   const urlParams = new URLSearchParams(window.location.search);
-  const profileId = urlParams.get("id");
+  let profileId = urlParams.get("id");
 
+  // ✅ If no profileId is provided, show the logged-in user's profile
   if (!profileId) {
-    alert("Invalid profile ID");
-    window.location.href = "dashboard.html";
-    return;
+    const user = auth.currentUser;
+    if (!user) {
+      alert("You are not signed in. Redirecting...");
+      window.location.href = "signin.html";
+      return;
+    }
+    profileId = user.uid;
   }
 
   try {
@@ -20,67 +25,36 @@ async function loadProfile() {
       const profileData = profileSnap.data();
       displayProfile(profileData);
     } else {
-      alert("Profile not found");
-      window.location.href = "dashboard.html";
+      document.getElementById("profile-container").innerHTML = `<p style="color: red;">Profile not found</p>`;
     }
   } catch (error) {
     console.error("Error loading profile:", error);
-    alert("Error loading profile");
-    window.location.href = "dashboard.html";
+    document.getElementById("profile-container").innerHTML = `<p style="color: red;">Error loading profile</p>`;
   }
 }
 
-// Function to display profile data
+// ✅ Function to Display Profile
 function displayProfile(profile) {
-  document.getElementById("profile-name").textContent = profile.name;
-  document.getElementById("profile-email").textContent = profile.email;
+  document.getElementById("profile-name").textContent = profile.username || "N/A";
+  document.getElementById("profile-email").textContent = profile.email || "N/A";
   document.getElementById("profile-phone").textContent = profile.phone || "N/A";
   document.getElementById("profile-address").textContent = profile.address || "N/A";
-  document.getElementById("profile-role").textContent = profile.role;
+  document.getElementById("profile-role").textContent = profile.role || "N/A";
 
-  // ✅ Always Show Government ID if Admin
-  if (auth.currentUser && auth.currentUser.email === "admin@gmail.com") {
+  // ✅ Show Government ID only for Admin
+  if (profile.govID && profile.role === "admin") {
     document.getElementById("gov-id-link").href = profile.govID;
     document.getElementById("gov-id-section").style.display = "block";
-    document.getElementById("profile-email").style.display = "block";
   }
 
-  // 🚫 Hide email for non-admins
-  if (auth.currentUser && auth.currentUser.email !== "admin@gmail.com" && auth.currentUser.uid !== profile.uid) {
+  // ✅ Hide email for normal users or service providers
+  if (profile.role !== "admin") {
     document.getElementById("profile-email").style.display = "none";
   }
-
-  // ✅ Show Government ID only if it's their own or Admin
-  if (auth.currentUser && (auth.currentUser.email === "admin@gmail.com" || auth.currentUser.uid === profile.uid)) {
-    document.getElementById("gov-id-link").href = profile.govID;
-    document.getElementById("gov-id-section").style.display = "block";
-  }
 }
 
-// Function to download profile as PDF
-function downloadProfile() {
-  const content = document.querySelector(".profile-card").innerHTML;
-  const blob = new Blob([content], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "Profile.html";
-  a.click();
-}
-
-// ✅ Authentication Logic
+// ✅ Automatically Load Profile when User Signs In
 auth.onAuthStateChanged((user) => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const profileId = urlParams.get("id");
-
-  // ✅ If Admin, allow access without login
-  if (profileId && !user && window.location.href.includes("admin@gmail.com")) {
-    loadProfile();
-    return;
-  }
-
-  // ✅ If User, enforce login
   if (user) {
     loadProfile();
   } else {
