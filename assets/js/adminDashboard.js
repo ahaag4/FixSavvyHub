@@ -84,7 +84,7 @@ async function loadAllProviders() {
 }
 
 // ==========================
-// ✅ Load All Service Requests
+// ✅ Load All Service Requests with Date, Time & Feedback
 // ==========================
 async function loadAllRequests() {
   const requestsDiv = document.getElementById("all-requests");
@@ -101,6 +101,10 @@ async function loadAllRequests() {
         <p><b>Requested By:</b> ${data.requestedBy}</p>
         <p><b>Assigned To:</b> ${data.assignedTo || "Unassigned"}</p>
         <p><b>Status:</b> ${data.status}</p>
+        <p><b>Request Date:</b> ${data.requestDate || "N/A"}</p>
+        <p><b>Completion Date:</b> ${data.completionDate || "N/A"}</p>
+        <p><b>Feedback:</b> ${data.feedback || "No Feedback"}</p>
+        <p><b>Rating:</b> ${data.rating || "Not Rated"}</p>
         <button onclick="markCompleted('${doc.id}')">Mark Completed</button>
         <button onclick="cancelService('${doc.id}')">Cancel Service</button>
       </div>
