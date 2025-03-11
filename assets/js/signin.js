@@ -6,26 +6,26 @@ const signinForm = document.getElementById('signin-form');
 signinForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  // ✅ Get email and password from form input fields
   const email = signinForm['email'].value;
   const password = signinForm['password'].value;
 
   try {
-    // ✅ Sign in user with email and password
+    // Sign in with email and password
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // ✅ Check if user email is verified
+    // ✅ Fetch fresh user data to ensure accurate email verification status
+    await user.reload();
+
     if (!user.emailVerified) {
       alert('Please verify your email address before signing in.');
       return;
     }
 
-    // ✅ Redirect user after successful sign-in
-    alert('Sign-in successful! Redirecting to dashboard...');
+    // ✅ Successful login - Redirect to dashboard
+    alert('Sign-in successful!');
     window.location.href = 'dashboard.html';
   } catch (error) {
-    // ✅ Improved error handling
     console.error('Sign-in error:', error.message);
 
     if (error.code === 'auth/user-not-found') {
