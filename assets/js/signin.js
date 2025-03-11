@@ -1,41 +1,43 @@
-import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-import { auth, db } from "./firebase.js";
+import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.17.2/firebase-auth.js';
+import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore.js';
+import { auth, db } from './firebase.js';
 
-// Initialize Auth and Firestore
-const auth = getAuth();
-const db = getFirestore();
+const signinForm = document.getElementById('signin-form');
 
-// Sign In Function
-document.getElementById("signin-form").addEventListener("submit", async (e) => {
+signinForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
+  const email = signinForm['email'].value;
+  const password = signinForm['password'].value;
 
   try {
+    // ✅ Sign in with email and password
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // ✅ Check the role of the user
-    const userDoc = await getDoc(doc(db, "users", user.uid));
+    // ✅ Fetch user role from Firestore
+    const userDocRef = doc(db, "users", user.uid);
+    const userDocSnap = await getDoc(userDocRef);
 
-    if (userDoc.exists()) {
-      const role = userDoc.data().role;
+    if (userDocSnap.exists()) {
+      const userData = userDocSnap.data();
+      const role = userData.role;
 
+      // ✅ Redirect user based on role
       if (role === "user") {
-        window.location.href = "user.html";
+        window.location.href = 'user.html';
       } else if (role === "service_provider") {
-        window.location.href = "serviceProvider.html";
+        window.location.href = 'serviceProvider.html';
       } else if (role === "admin") {
-        window.location.href = "admin.html";
+        window.location.href = 'admin.html';
       } else {
-        alert("Invalid Role. Contact Support.");
+        alert('Invalid role detected. Please contact support.');
       }
     } else {
-      alert("No profile data found.");
+      alert('No user data found. Please contact support.');
     }
   } catch (error) {
-    alert("Error Signing In: " + error.message);
+    console.error('Sign-in error:', error.message);
+    alert('Sign-in failed: ' + error.message);
   }
 });
