@@ -57,10 +57,12 @@
   <h2>Request a Service</h2>
   <form id="request-service-form">
     <label>Service:</label>
-    <select id="service" required>
-          <option value="" disabled selected>Select a service</option>
-          ${services.map(service => `<option value="${service}">${service}</option>`).join("")}
-    </select><br><br>
+        <select id="service" required>
+      <option value="" disabled selected>Select a service</option>
+      <option value="Plumbing">Plumbing</option>
+      <option value="Electrician">Electrician</option>
+      <option value="Carpenter">Carpenter</option>
+        </select>><br><br>
     <button type="submit">Request Service</button>
   </form>
 </section>
