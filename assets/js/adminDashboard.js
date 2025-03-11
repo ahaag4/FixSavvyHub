@@ -16,6 +16,7 @@ auth.onAuthStateChanged(async (user) => {
   loadAllUsers();
   loadAllProviders();
   loadAllRequests();
+  loadAllStats();
 });
 
 // ==========================
@@ -84,7 +85,7 @@ async function loadAllProviders() {
 }
 
 // ==========================
-// ✅ Load All Service Requests with Date, Time & Feedback
+// ✅ Load All Service Requests
 // ==========================
 async function loadAllRequests() {
   const requestsDiv = document.getElementById("all-requests");
@@ -102,29 +103,46 @@ async function loadAllRequests() {
         <p><b>Assigned To:</b> ${data.assignedTo || "Unassigned"}</p>
         <p><b>Status:</b> ${data.status}</p>
         <p><b>Request Date:</b> ${data.requestDate || "N/A"}</p>
-        <p><b>Completion Date:</b> ${data.completionDate || "N/A"}</p>
         <p><b>Feedback:</b> ${data.feedback || "No Feedback"}</p>
         <p><b>Rating:</b> ${data.rating || "Not Rated"}</p>
-        <button onclick="markCompleted('${doc.id}')">Mark Completed</button>
-        <button onclick="cancelService('${doc.id}')">Cancel Service</button>
+        <button onclick="reassignService('${doc.id}')">Reassign</button>
+        <button onclick="changeStatus('${doc.id}')">Change Status</button>
       </div>
       <hr>
     `;
   });
 }
 
-window.markCompleted = async function(serviceId) {
-  await updateDoc(doc(db, "services", serviceId), { status: "Completed" });
-  alert("Service marked as completed.");
+window.reassignService = async function(serviceId) {
+  const newProviderId = prompt("Enter new Service Provider ID:");
+  await updateDoc(doc(db, "services", serviceId), { assignedTo: newProviderId });
+  alert("Service Reassigned!");
   loadAllRequests();
 }
 
-window.cancelService = async function(serviceId) {
-  await updateDoc(doc(db, "services", serviceId), { status: "Cancelled" });
-  alert("Service cancelled.");
+window.changeStatus = async function(serviceId) {
+  const newStatus = prompt("Enter new Status (In Progress, Completed, Cancelled):");
+  await updateDoc(doc(db, "services", serviceId), { status: newStatus });
+  alert("Status Changed!");
   loadAllRequests();
 }
 
+// ==========================
+// ✅ Dashboard Stats
+// ==========================
+async function loadAllStats() {
+  const users = await getDocs(collection(db, "users"));
+  const providers = await getDocs(query(collection(db, "users"), where("role", "==", "service_provider")));
+  const requests = await getDocs(collection(db, "services"));
+
+  document.getElementById("total-users").textContent = users.size;
+  document.getElementById("total-providers").textContent = providers.size;
+  document.getElementById("total-requests").textContent = requests.size;
+}
+
+// ==========================
+// ✅ Logout
+// ==========================
 window.logout = function() {
   auth.signOut();
   window.location.href = "signin.html";
