@@ -4,28 +4,57 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard - Fixeasy</title>
-  <link rel="stylesheet" href="/assets/css/admin.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      padding: 20px;
+    }
+    .section {
+      background-color: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    button {
+      padding: 10px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .status {
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
 
-<header>
-  <h1>Admin Dashboard - Fixeasy</h1>
-  <button onclick="logout()">Logout</button>
-</header>
+<h1>Welcome to Admin Dashboard - Fixeasy</h1>
 
-<section>
-  <h2>All Users</h2>
-  <div id="all-users"></div>
+<section class="section">
+  <h2>Pending Service Requests</h2>
+  <div id="pending-requests"></div>
 </section>
 
-<section>
-  <h2>All Service Providers</h2>
-  <div id="all-providers"></div>
+<section class="section">
+  <h2>Approved Gov ID Requests</h2>
+  <div id="approved-requests"></div>
 </section>
 
-<section>
-  <h2>All Service Requests</h2>
-  <div id="all-requests"></div>
+<section class="section">
+  <h2>User & Service Provider Management</h2>
+  <div id="user-management"></div>
+</section>
+
+<section class="section">
+  <h2>Payment Verification</h2>
+  <div id="payment-verification"></div>
 </section>
 
 <script type="module" src="/assets/js/adminDashboard.js"></script>
