@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service Provider Dashboard - Fixeasy</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f5f5f5;
+    }
+    .section {
+      background-color: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+      margin-top: 0;
+    }
+    .hidden {
+      display: none;
+    }
+    button {
+      padding: 10px 15px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    a {
+      text-decoration: none;
+      color: #007bff;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Welcome to Fixeasy - Service Provider Dashboard</h1>
+
+<section class="section" id="section-1">
+  <h2>Complete Your Profile</h2>
+  <form id="profile-form">
+    <label>Username:</label>
+    <input type="text" id="username" required><br><br>
+    <label>Phone:</label>
+    <input type="text" id="phone" required><br><br>
+    <label>Address:</label>
+    <input type="text" id="address" required><br><br>
+    <label>Upload Gov ID (Aadhar/PAN):</label>
+    <input type="file" id="gov-id" required><br><br>
+    <button type="submit">Save Profile</button>
+  </form>
+</section>
+
+<section class="section hidden" id="section-2">
+  <h2>Assigned Services</h2>
+  <div id="assigned-service"></div>
+</section>
+
+<section class="section hidden" id="section-3">
+  <h2>Service History</h2>
+  <div id="service-history"></div>
+</section>
+
+<section class="section hidden" id="section-4">
+  <h2>Your Profile</h2>
+  <a href="#" id="view-profile">View My Profile</a>
+</section>
+
+<script type="module" src="/assets/js/serviceProvider.js"></script>
+</body>
+</html>
