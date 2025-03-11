@@ -64,7 +64,7 @@ async function loadApprovedRequests() {
     if (data.govID && data.role === "service_provider") {
       approvedDiv.innerHTML += `
         <div>
-          <p><b>Name:</b> ${data.name}</p>
+          <p><b>Name:</b> ${data.username}</p>
           <p><b>Gov ID:</b> <a href="${data.govID}" target="_blank">View ID</a></p>
           <button onclick="approveGov('${docSnap.id}')">Approve</button>
           <button onclick="rejectGov('${docSnap.id}')">Reject</button>
