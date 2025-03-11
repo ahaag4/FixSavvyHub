@@ -1,23 +1,38 @@
-import { auth } from './firebase.js';
-import { signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.17.2/firebase-auth.js';
+import { auth, db } from "./firebase.js";
+import {
+  doc, getDoc
+} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-const signinForm = document.getElementById('signin-form');
-
-signinForm.addEventListener('submit', async (e) => {
+// Sign In Function
+document.getElementById("signin-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const email = signinForm['email'].value;
-  const password = signinForm['password'].value;
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
   try {
-    // Sign in with email and password
-    await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+    const user = userCredential.user;
 
-    // Redirect to dashboard after successful signin
-    alert('Sign-in successful!');
-    window.location.href = 'dashboard.html';
+    // ✅ Check the role of the user
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+
+    if (userDoc.exists()) {
+      const role = userDoc.data().role;
+
+      if (role === "user") {
+        window.location.href = "user.html"; // Redirect to User Dashboard
+      } else if (role === "service_provider") {
+        window.location.href = "serviceProvider.html"; // Redirect to Service Provider Dashboard
+      } else if (role === "admin") {
+        window.location.href = "admin.html"; // Redirect to Admin Dashboard
+      } else {
+        alert("Invalid Role. Contact Support.");
+      }
+    } else {
+      alert("No profile data found.");
+    }
   } catch (error) {
-    console.error('Sign-in error:', error.message);
-    alert('Sign-in failed: ' + error.message);
+    alert("Error Signing In: " + error.message);
   }
 });
