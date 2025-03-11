@@ -65,7 +65,7 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   location.reload();
 });
 
-// ✅ Section 2: Load Assigned Services
+// ✅ Section 2: Load Assigned Services (Auto-Hide on Cancel/Complete)
 async function loadAssignedServices() {
   const q = query(collection(db, "services"), where("assignedTo", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -77,6 +77,11 @@ async function loadAssignedServices() {
     const data = docSnap.data();
     const userRef = await getDoc(doc(db, "users", data.requestedBy));
     const user = userRef.data();
+
+    // ✅ Auto-Hide if Status is Cancelled or Completed
+    if (data.status === "Cancelled" || data.status === "Completed") {
+      return;
+    }
 
     container.innerHTML += `
       <div>
@@ -92,7 +97,7 @@ async function loadAssignedServices() {
   });
 }
 
-// ✅ Section 3: Mark Service Completed
+// ✅ Section 3: Mark Service Completed (Auto-Hide)
 window.markCompleted = async (serviceId) => {
   await updateDoc(doc(db, "services", serviceId), { status: "Completed" });
   alert("Service marked as completed!");
@@ -151,5 +156,5 @@ async function loadSummary() {
 }
 
 // ✅ Section 6: View Profile
-document.getElementById("view-profile").href = `profile.html`;
+document.getElementById("view-profile").href = `profile.html?id=${userId}`;
   
