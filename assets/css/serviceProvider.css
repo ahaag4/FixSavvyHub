@@ -1,0 +1,146 @@
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f5f5f5;
+  margin: 0;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  color: #007bff;
+}
+
+.section {
+  background-color: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+  margin-top: 0;
+  color: #333;
+}
+
+.hidden {
+  display: none;
+}
+
+button {
+  padding: 10px 15px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-right: 10px;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+input[type="text"],
+input[type="file"],
+textarea,
+select {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+a {
+  text-decoration: none;
+  color: #007bff;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+hr {
+  border: 0.5px solid #eee;
+  margin: 20px 0;
+}
+
+/* ✅ Assigned Services Section */
+#assigned-service div {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+}
+
+/* ✅ Service History Section */
+#service-history div {
+  background-color: #fff;
+  border: 1px solid #eee;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+}
+
+/* ✅ Summary Section */
+#section-5 p {
+  margin: 10px 0;
+  font-size: 16px;
+  color: #555;
+}
+
+#section-5 span {
+  font-weight: bold;
+  color: #333;
+}
+
+/* ✅ Profile Section */
+#view-profile {
+  background-color: #28a745;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 5px;
+  text-decoration: none;
+}
+
+#view-profile:hover {
+  background-color: #218838;
+}
+
+/* ✅ Button Styles */
+button.cancel {
+  background-color: #dc3545;
+}
+
+button.cancel:hover {
+  background-color: #c82333;
+}
+
+button.complete {
+  background-color: #28a745;
+}
+
+button.complete:hover {
+  background-color: #218838;
+}
+
+/* ✅ Responsive Design */
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+
+  button {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+  }
+}
