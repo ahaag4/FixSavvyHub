@@ -19,7 +19,7 @@ auth.onAuthStateChanged(async (user) => {
   await loadServiceHistory();
 });
 
-// ✅ Section 1: Complete Profile
+// ✅ Section 1: Load Profile
 async function loadServiceProviderProfile() {
   const userDoc = await getDoc(doc(db, "users", userId));
 
@@ -38,24 +38,6 @@ async function loadServiceProviderProfile() {
   }
 }
 
-document.getElementById("profile-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const username = document.getElementById("username").value;
-  const phone = document.getElementById("phone").value;
-  const address = document.getElementById("address").value;
-  const govIDFile = document.getElementById("gov-id").files[0];
-
-  await setDoc(doc(db, "users", userId), {
-    username, phone, address,
-    govID: govIDFile.name,
-    role: "service_provider"
-  }, { merge: true });
-
-  alert("Profile Updated!");
-  location.reload();
-});
-
 // ✅ Section 2: Load Assigned Services
 async function loadAssignedServices() {
   const q = query(collection(db, "services"), where("assignedTo", "==", userId));
@@ -64,18 +46,34 @@ async function loadAssignedServices() {
   const container = document.getElementById("assigned-service");
   container.innerHTML = "";
 
+  if (services.empty) {
+    container.innerHTML = `<p>No services assigned yet.</p>`;
+    return;
+  }
+
   services.forEach(async (docSnap) => {
     const data = docSnap.data();
+
+    if (!data.requestedBy) {
+      container.innerHTML += `
+        <p><b>Service:</b> ${data.serviceName}</p>
+        <p><b>Status:</b> ${data.status}</p>
+        <p style="color: red;"><b>Error:</b> RequestedBy Undefined</p>
+      `;
+      return;
+    }
+
     const userRef = await getDoc(doc(db, "users", data.requestedBy));
-    const user = userRef.data();
+    const user = userRef.exists() ? userRef.data() : null;
 
     container.innerHTML += `
       <p><b>Service:</b> ${data.serviceName}</p>
-      <p><b>Requested By:</b> ${user.username}</p>
-      <p><b>Phone:</b> ${user.phone}</p>
-      <p><b>Address:</b> ${user.address}</p>
+      <p><b>Status:</b> ${data.status}</p>
+      <p><b>Requested By:</b> ${user ? user.username : "Unknown"}</p>
+      <p><b>Phone:</b> ${user ? user.phone : "N/A"}</p>
+      <p><b>Address:</b> ${user ? user.address : "N/A"}</p>
+      <a href="profile.html?id=${data.requestedBy}" target="_blank">View User Profile</a>
       <button onclick="markCompleted('${docSnap.id}')">Mark Completed</button>
-      <a href="profile.html?id=${userRef.id}">View User Profile</a>
     `;
   });
 }
@@ -97,7 +95,6 @@ async function loadServiceHistory() {
 
   services.forEach((docSnap) => {
     const data = docSnap.data();
-
     container.innerHTML += `
       <p><b>Service:</b> ${data.serviceName}</p>
       <p><b>Status:</b> ${data.status}</p>
