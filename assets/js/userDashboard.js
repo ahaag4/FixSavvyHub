@@ -66,11 +66,19 @@ document.getElementById("request-service-form").addEventListener("submit", async
   const service = document.getElementById("service").value;
   const serviceProvider = await autoAssignServiceProvider();
 
+  if (!serviceProvider) {
+    alert("No Service Provider Available. Try again later.");
+    return;
+  }
+
   const docRef = await addDoc(collection(db, "services"), {
     serviceName: service,
     requestedBy: userId,
     assignedTo: serviceProvider,
-    status: "Assigned"
+    status: "Assigned",
+    feedback: "",
+    rating: "",
+    createdAt: new Date()
   });
 
   latestServiceId = docRef.id;
@@ -83,9 +91,9 @@ async function autoAssignServiceProvider() {
   const providers = await getDocs(q);
 
   if (!providers.empty) {
+    // Assign the first available service provider
     return providers.docs[0].id;
   }
-  alert("No service provider available.");
   return null;
 }
 
@@ -104,10 +112,13 @@ async function loadUserServices() {
     const providerProfile = await getDoc(doc(db, "users", data.assignedTo));
 
     serviceContainer.innerHTML += `
-      <p><b>Service:</b> ${data.serviceName}</p>
-      <p><b>Status:</b> ${data.status}</p>
-      <p><b>Service Provider:</b> ${providerProfile.data().username}</p>
-      <button onclick="cancelService('${doc.id}')">Cancel Service</button>
+      <div style="border:1px solid #ccc;padding:10px;margin-bottom:10px;">
+        <p><b>Service:</b> ${data.serviceName}</p>
+        <p><b>Status:</b> ${data.status}</p>
+        <p><b>Service Provider:</b> ${providerProfile.data().username}</p>
+        ${data.status === "Assigned" ? 
+          `<button onclick="cancelService('${doc.id}')">Cancel Service</button>` : ''}
+      </div>
     `;
 
     if (data.status === "Completed") {
