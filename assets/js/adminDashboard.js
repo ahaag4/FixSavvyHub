@@ -32,7 +32,7 @@ async function loadAllUsers() {
     const data = doc.data();
     usersDiv.innerHTML += `
       <div>
-        <p><b>Name:</b> ${data.name}</p>
+        <p><b>Username:</b> ${data.username}</p>
         <p><b>Phone:</b> ${data.phone}</p>
         <p><b>Address:</b> ${data.address}</p>
         <p><b>Role:</b> ${data.role}</p>
