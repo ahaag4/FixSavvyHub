@@ -192,7 +192,6 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   location.reload();
 });
 
-// ✅ Section 6: Request Gold Plan (Pending Approval)
 window.requestGoldPlan = async () => {
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
@@ -204,3 +203,34 @@ window.requestGoldPlan = async () => {
   location.reload();
 };
 
+// ✅ Check Subscription Status & Update UI
+async function checkSubscription() {
+  const subDoc = await getDoc(doc(db, "subscriptions", userId));
+
+  if (subDoc.exists()) {
+    const data = subDoc.data();
+    subscriptionPlan = data.plan;
+    remainingRequests = data.remainingRequests;
+    const status = data.status || "Active"; // Default to Active if undefined
+
+    document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
+    document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
+
+    // 🚀 Show correct button based on subscription status
+    if (status === "Pending") {
+      document.getElementById("upgrade-btn").innerText = "Pending Approval";
+      document.getElementById("upgrade-btn").disabled = true;
+    } else if (subscriptionPlan === "Gold") {
+      document.getElementById("upgrade-btn").innerText = "Gold Plan Active";
+      document.getElementById("upgrade-btn").disabled = true;
+    }
+  } else {
+    // 🚀 If no subscription, assign Free Plan
+    await setDoc(doc(db, "subscriptions", userId), {
+      plan: "Free",
+      remainingRequests: 5,
+      status: "Active"
+    });
+    location.reload();
+  }
+}
