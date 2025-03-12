@@ -1,9 +1,11 @@
 import { auth, db } from "./firebase.js";
 import {
-  doc, getDoc, getDocs, collection, query, where, updateDoc, deleteDoc, setDoc
+  doc, getDoc, getDocs, collection, query, where, updateDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-// ✅ Authenticate Admin
+// ==========================
+// ✅ Admin Dashboard Initialization
+// ==========================
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("Not signed in. Redirecting...");
@@ -17,7 +19,9 @@ auth.onAuthStateChanged(async (user) => {
   loadAllStats();
 });
 
-// ✅ Section 1: Load All Users
+// ==========================
+// ✅ Load All Users
+// ==========================
 async function loadAllUsers() {
   const usersDiv = document.getElementById("all-users");
   usersDiv.innerHTML = `<p>Loading...</p>`;
@@ -53,7 +57,9 @@ window.deleteUser = async function(userId) {
   }
 }
 
-// ✅ Section 2: Load All Service Providers
+// ==========================
+// ✅ Load All Service Providers
+// ==========================
 async function loadAllProviders() {
   const providersDiv = document.getElementById("all-providers");
   providersDiv.innerHTML = `<p>Loading...</p>`;
@@ -66,11 +72,12 @@ async function loadAllProviders() {
     const data = doc.data();
     providersDiv.innerHTML += `
       <div>
+        <p><b>UserID:</b> ${data.providerID}</p>
         <p><b>Name:</b> ${data.username}</p>
         <p><b>Phone:</b> ${data.phone}</p>
         <p><b>Gov ID:</b> <a href="${data.govID}" target="_blank">View ID</a></p>
         <p><b>Location:</b> ${data.address}</p>
-        <button onclick="approveGovID('${doc.id}')">Approve Gov ID</button>
+        <button onclick="viewProfile('${doc.id}')">View Profile</button>
         <button onclick="deleteUser('${doc.id}')">Delete Provider</button>
       </div>
       <hr>
@@ -78,13 +85,9 @@ async function loadAllProviders() {
   });
 }
 
-window.approveGovID = async function(userId) {
-  await updateDoc(doc(db, "users", userId), { govIDApproved: true });
-  alert("Gov ID Approved.");
-  loadAllProviders();
-}
-
-// ✅ Section 3: Load All Service Requests
+// ==========================
+// ✅ Load All Service Requests
+// ==========================
 async function loadAllRequests() {
   const requestsDiv = document.getElementById("all-requests");
   requestsDiv.innerHTML = `<p>Loading...</p>`;
@@ -100,6 +103,9 @@ async function loadAllRequests() {
         <p><b>Requested By:</b> ${data.requestedBy}</p>
         <p><b>Assigned To:</b> ${data.assignedTo || "Unassigned"}</p>
         <p><b>Status:</b> ${data.status}</p>
+        <p><b>Request Date:</b> ${data.requestDate || "N/A"}</p>
+        <p><b>Feedback:</b> ${data.feedback || "No Feedback"}</p>
+        <p><b>Rating:</b> ${data.rating || "Not Rated"}</p>
         <button onclick="reassignService('${doc.id}')">Reassign</button>
         <button onclick="changeStatus('${doc.id}')">Change Status</button>
       </div>
@@ -133,7 +139,9 @@ window.subscribeUser = async (userId) => {
   location.reload();
 }
 
-// ✅ Section 5: Load Dashboard Stats
+// ==========================
+// ✅ Dashboard Stats
+// ==========================
 async function loadAllStats() {
   const users = await getDocs(collection(db, "users"));
   const providers = await getDocs(query(collection(db, "users"), where("role", "==", "service_provider")));
@@ -144,7 +152,9 @@ async function loadAllStats() {
   document.getElementById("total-requests").textContent = requests.size;
 }
 
-// ✅ Section 6: Logout
+// ==========================
+// ✅ Logout
+// ==========================
 window.logout = function() {
   auth.signOut();
   window.location.href = "signin.html";
