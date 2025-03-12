@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { doc, getDoc, query, where, getDocs, collection } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 // ✅ Function to Load Profile Data
 async function loadProfile() {
@@ -7,7 +7,6 @@ async function loadProfile() {
   let profileId = urlParams.get("id");
 
   try {
-    // ✅ Ensure user is logged in
     const user = auth.currentUser;
     if (!user) {
       alert("You are not signed in. Redirecting...");
@@ -20,17 +19,25 @@ async function loadProfile() {
     const userData = userDoc.exists() ? userDoc.data() : null;
     const isAdmin = userData?.role === "admin";
 
-    // ✅ If no profile ID in URL, load the logged-in user's profile
-    if (!profileId) {
-      profileId = user.uid;
-    } else if (!isAdmin && profileId !== user.uid) {
-      // ❌ Block non-admin users from viewing others' profiles
-      alert("You are not authorized to view this profile.");
-      window.location.href = "dashboard.html";
-      return;
+    // ✅ Allow admins to view any profile
+    if (isAdmin) {
+      if (!profileId) profileId = user.uid;
+    } else {
+      // ✅ If user is not admin, check if they are allowed to view this profile
+      if (!profileId || profileId === user.uid) {
+        profileId = user.uid;
+      } else {
+        // ✅ Check if this profile is their assigned service provider
+        const assignedProvider = await getAssignedProvider(user.uid);
+        if (profileId !== assignedProvider) {
+          alert("You are not authorized to view this profile.");
+          window.location.href = "dashboard.html";
+          return;
+        }
+      }
     }
 
-    // ✅ Fetch the target profile
+    // ✅ Fetch the profile to display
     const profileRef = doc(db, "users", profileId);
     const profileSnap = await getDoc(profileRef);
 
@@ -43,6 +50,19 @@ async function loadProfile() {
     console.error("Error loading profile:", error);
     document.getElementById("profile-container").innerHTML = `<p style="color: red;">Error loading profile</p>`;
   }
+}
+
+// ✅ Function to Fetch Assigned Service Provider
+async function getAssignedProvider(userId) {
+  const q = query(collection(db, "services"), where("requestedBy", "==", userId));
+  const querySnapshot = await getDocs(q);
+  
+  for (const docSnap of querySnapshot.docs) {
+    const data = docSnap.data();
+    if (data.assignedTo) return data.assignedTo; // Return the first assigned provider found
+  }
+  
+  return null;
 }
 
 // ✅ Function to Display Profile Data
@@ -60,7 +80,7 @@ function displayProfile(profile, isAdmin) {
     document.getElementById("profile-email").style.display = "none";
   }
 
-  // ✅ Show Government ID only for Admin
+  // ✅ Show Government ID only for Admins
   if (profile.govID && isAdmin) {
     document.getElementById("gov-id-link").href = profile.govID;
     document.getElementById("gov-id-section").style.display = "block";
