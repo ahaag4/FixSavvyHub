@@ -4,9 +4,11 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId;
+let subscriptionPlan;
+let remainingRequests;
+let subscriptionStatus;
 
-// Check authentication
+// ✅ Authenticate User
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("You are not signed in. Redirecting...");
@@ -16,145 +18,129 @@ auth.onAuthStateChanged(async (user) => {
 
   userId = user.uid;
   await loadUserProfile();
+  await checkSubscription();
   await loadUserServices();
 });
 
-// ==========================
-// ✅ Section 1: Complete Profile
-// ==========================
+// ✅ Section 1: Load Profile
 async function loadUserProfile() {
   const userDoc = await getDoc(doc(db, "users", userId));
 
   if (userDoc.exists()) {
     const userData = userDoc.data();
-    document.getElementById("username").value = userData.username;
-    document.getElementById("phone").value = userData.phone;
-    document.getElementById("address").value = userData.address;
-
-    if (userData.phone && userData.address) {
-      document.getElementById("section-1").classList.add("hidden");
-      document.getElementById("section-2").classList.remove("hidden");
-      document.getElementById("section-3").classList.remove("hidden");
-    }
+    document.getElementById("username").innerText = userData.username;
+    document.getElementById("phone").innerText = userData.phone;
+    document.getElementById("address").innerText = userData.address;
   }
 }
 
-document.getElementById("profile-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
+// ✅ Section 2: Check Subscription
+async function checkSubscription() {
+  const userDoc = await getDoc(doc(db, "subscriptions", userId));
+  if (userDoc.exists()) {
+    const data = userDoc.data();
+    subscriptionPlan = data.plan;
+    remainingRequests = data.remainingRequests;
+    subscriptionStatus = data.status;
 
-  const username = document.getElementById("username").value;
-  const phone = document.getElementById("phone").value;
-  const address = document.getElementById("address").value;
+    document.getElementById("subscription").innerText = subscriptionPlan;
+    document.getElementById("remaining-requests").innerText = remainingRequests;
 
-  await setDoc(doc(db, "users", userId), {
-    username,
-    phone,
-    address,
-    role: "user"
-  }, { merge: true });
+    if (subscriptionStatus === "expired") {
+      alert("Your subscription has expired. Please renew.");
+    }
+  } else {
+    document.getElementById("subscription-section").classList.remove("hidden");
+  }
+}
 
-  alert("Profile Updated!");
-  location.reload();
-});
-
-// ==========================
-// ✅ Section 2: Request Service
-// ==========================
+// ✅ Section 3: Request Service
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (subscriptionStatus === "expired") {
+    alert("Your subscription expired. Please renew.");
+    return;
+  }
+  if (remainingRequests <= 0 && subscriptionPlan !== "Premium") {
+    alert("Request limit reached. Upgrade to Premium.");
+    return;
+  }
 
   const service = document.getElementById("service").value;
-  const serviceProvider = await autoAssignServiceProvider();
+  const provider = await autoAssignServiceProvider();
 
-  const docRef = await addDoc(collection(db, "services"), {
+  if (!provider) {
+    alert("No service provider available.");
+    return;
+  }
+
+  await addDoc(collection(db, "services"), {
     serviceName: service,
     requestedBy: userId,
-    assignedTo: serviceProvider,
+    assignedTo: provider,
     status: "Assigned"
   });
 
-  latestServiceId = docRef.id;
-  alert("Service Requested and Assigned!");
+  await updateDoc(doc(db, "subscriptions", userId), {
+    remainingRequests: remainingRequests - 1
+  });
+
+  alert("Service Requested!");
   location.reload();
 });
 
+// ✅ Section 4: Auto Assign Service Provider (Sponsored First)
 async function autoAssignServiceProvider() {
   const q = query(collection(db, "users"), where("role", "==", "service_provider"));
   const providers = await getDocs(q);
 
-  if (!providers.empty) {
-    return providers.docs[0].id;
-  }
-  alert("No service provider available.");
+  let sponsoredProviders = [];
+  let regularProviders = [];
+
+  providers.forEach(doc => {
+    if (doc.data().isSponsored) {
+      sponsoredProviders.push(doc.id);
+    } else {
+      regularProviders.push(doc.id);
+    }
+  });
+
+  if (sponsoredProviders.length > 0) return sponsoredProviders[0];
+  if (regularProviders.length > 0) return regularProviders[0];
+
   return null;
 }
 
-// ==========================
-// ✅ Section 3: Track Service
-// ==========================
+// ✅ Section 5: Load Services
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
   const querySnapshot = await getDocs(q);
 
-  const serviceContainer = document.getElementById("assigned-service");
-  serviceContainer.innerHTML = "";
+  const container = document.getElementById("user-services");
+  container.innerHTML = "";
 
-  if (querySnapshot.empty) {
-    serviceContainer.innerHTML = `<p>No services requested yet.</p>`;
-    return;
-  }
-
-  querySnapshot.forEach(async (docSnap) => {
+  querySnapshot.forEach(docSnap => {
     const data = docSnap.data();
-    let providerProfile = "Not Assigned";
-
-    if (data.assignedTo) {
-      const providerDoc = await getDoc(doc(db, "users", data.assignedTo));
-      if (providerDoc.exists()) {
-        providerProfile = providerDoc.data().username;
-      }
-    }
-
-    serviceContainer.innerHTML += `
-      <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
-        <p><b>Service:</b> ${data.serviceName}</p>
-        <p><b>Status:</b> ${data.status}</p>
-        <p><b>Service Provider:</b> ${providerProfile}</p>
-        <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
-        <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
-        <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
-      </div>
+    container.innerHTML += `
+      <p><b>Service:</b> ${data.serviceName}</p>
+      <p><b>Status:</b> ${data.status}</p>
     `;
-
-    if (data.status === "Completed") {
-      document.getElementById("section-4").classList.remove("hidden");
-      latestServiceId = docSnap.id;
-    }
   });
 }
 
-window.cancelService = async (serviceId) => {
-  await updateDoc(doc(db, "services", serviceId), { status: "Cancelled" });
-  alert("Service Cancelled!");
-  location.reload();
-};
+// ✅ Section 6: Subscribe Plan
+window.subscribePlan = async (plan) => {
+  const amount = plan === "Basic" ? 299 : 599;
+  const requests = plan === "Basic" ? 5 : Infinity;
 
-// ==========================
-// ✅ Section 4: Feedback
-// ==========================
-document.getElementById("feedback-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const rating = document.getElementById("rating").value;
-  const feedback = document.getElementById("feedback").value;
-
-  await updateDoc(doc(db, "services", latestServiceId), {
-    feedback,
-    rating,
-    status: "Closed"
+  const paymentId = `pay_${Date.now()}`;
+  await setDoc(doc(db, "subscriptions", userId), {
+    plan: plan,
+    paymentId: paymentId,
+    remainingRequests: requests,
+    status: "active"
   });
 
-  alert("Feedback Submitted!");
+  alert("Subscription Activated!");
   location.reload();
-});
-  
+};
