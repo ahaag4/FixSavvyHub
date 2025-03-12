@@ -127,6 +127,18 @@ window.changeStatus = async function(serviceId) {
   alert("Status Changed!");
   loadAllRequests();
 }
+// ==========================
+// ✅ Load All Service Requests for subscribe 
+// ==========================
+window.subscribeUser = async (userId) => {
+  await setDoc(doc(db, "subscriptions", userId), {
+    plan: "Gold",
+    remainingRequests: 35
+  });
+
+  alert("User Upgraded to Gold Plan.");
+  location.reload();
+};
 
 // ==========================
 // ✅ Dashboard Stats
