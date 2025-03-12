@@ -6,7 +6,7 @@ import {
 let userId;
 let latestServiceId = null; // Set to null initially
 let subscriptionPlan = "Free";
-let remainingRequests = 5;
+let remainingRequests = 1;
 let subscriptionStatus = "Active";
 
 // ✅ Authenticate User
@@ -71,7 +71,7 @@ async function checkSubscription() {
   } else {
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
-      remainingRequests: 5,
+      remainingRequests: 1,
       status: "Active"
     });
     location.reload();
