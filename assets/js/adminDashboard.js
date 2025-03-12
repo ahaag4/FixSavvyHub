@@ -120,11 +120,11 @@ window.changeStatus = async function (serviceId) {
   alert("Status Changed!");
   loadAllRequests();
 };
-window.deleteService = async function (services) {
-  if (confirm("Are you sure you want to delete this user?")) {
-    await deleteDoc(doc(db, "users", userId,services));
-    alert("User deleted successfully.");
-    loadAllRequests();
+window.deleteServiceRequest = async function (serviceId) {
+  if (confirm("Are you sure you want to delete this service request?")) {
+    await deleteDoc(doc(db, "services", serviceId));
+    alert("Service request deleted successfully.");
+    loadAllRequests(); // Refresh service requests after deletion
   }
 };
 
