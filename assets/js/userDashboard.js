@@ -1,14 +1,15 @@
 import { auth, db } from "./firebase.js";
 import {
-  doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc
+  doc, setDoc, getDoc, collection, addDoc, query, where, getDocs, updateDoc
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
+let latestServiceId;
 let subscriptionPlan = "Free"; // Default Plan
 let remainingRequests = 5; // Default Free Plan Requests
 let subscriptionStatus = "Active"; // Default status
 
-// ✅ Authenticate User
+// Check authentication
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("You are not signed in. Redirecting...");
@@ -18,19 +19,21 @@ auth.onAuthStateChanged(async (user) => {
 
   userId = user.uid;
   await loadUserProfile();
-  await checkSubscription();
   await loadUserServices();
+  await checkSubscription();
 });
 
-// ✅ Load Profile
+// ==========================
+// ✅ Section 1: Complete Profile
+// ==========================
 async function loadUserProfile() {
   const userDoc = await getDoc(doc(db, "users", userId));
 
   if (userDoc.exists()) {
     const userData = userDoc.data();
-    document.getElementById("username").value = userData.username || "";
-    document.getElementById("phone").value = userData.phone || "";
-    document.getElementById("address").value = userData.address || "";
+    document.getElementById("username").value = userData.username;
+    document.getElementById("phone").value = userData.phone;
+    document.getElementById("address").value = userData.address;
 
     if (userData.phone && userData.address) {
       document.getElementById("section-1").classList.add("hidden");
@@ -86,7 +89,59 @@ window.requestGoldPlan = async () => {
   location.reload();
 };
 
-// ✅ Load User Services
+document.getElementById("profile-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const username = document.getElementById("username").value;
+  const phone = document.getElementById("phone").value;
+  const address = document.getElementById("address").value;
+
+  await setDoc(doc(db, "users", userId), {
+    username,
+    phone,
+    address,
+    role: "user"
+  }, { merge: true });
+
+  alert("Profile Updated!");
+  location.reload();
+});
+
+// ==========================
+// ✅ Section 2: Request Service
+// ==========================
+document.getElementById("request-service-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const service = document.getElementById("service").value;
+  const serviceProvider = await autoAssignServiceProvider();
+
+  const docRef = await addDoc(collection(db, "services"), {
+    serviceName: service,
+    requestedBy: userId,
+    assignedTo: serviceProvider,
+    status: "Assigned"
+  });
+
+  latestServiceId = docRef.id;
+  alert("Service Requested and Assigned!");
+  location.reload();
+});
+
+async function autoAssignServiceProvider() {
+  const q = query(collection(db, "users"), where("role", "==", "service_provider"));
+  const providers = await getDocs(q);
+
+  if (!providers.empty) {
+    return providers.docs[0].id;
+  }
+  alert("No service provider available.");
+  return null;
+}
+
+// ==========================
+// ✅ Section 3: Track Service
+// ==========================
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -123,18 +178,20 @@ async function loadUserServices() {
 
     if (data.status === "Completed") {
       document.getElementById("section-4").classList.remove("hidden");
+      latestServiceId = docSnap.id;
     }
   });
 }
 
-// ✅ Cancel Service
 window.cancelService = async (serviceId) => {
   await updateDoc(doc(db, "services", serviceId), { status: "Cancelled" });
   alert("Service Cancelled!");
   location.reload();
 };
 
-// ✅ Submit Feedback
+// ==========================
+// ✅ Section 4: Feedback
+// ==========================
 document.getElementById("feedback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -150,3 +207,4 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   alert("Feedback Submitted!");
   location.reload();
 });
+
