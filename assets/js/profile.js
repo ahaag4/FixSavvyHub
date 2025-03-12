@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase.js";
-import { doc, getDoc, query, where, getDocs, collection } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { doc, getDoc, getDocs, collection, query, where, updateDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 // ✅ Function to Load Profile Data
 async function loadProfile() {
@@ -17,8 +17,14 @@ async function loadProfile() {
     // ✅ Fetch logged-in user's details
     const userDoc = await getDoc(doc(db, "users", user.uid));
     const userData = userDoc.exists() ? userDoc.data() : null;
-    const isAdmin = userData?.role === "admin";
-    const isServiceProvider = userData?.role === "service_provider";
+
+    if (!userData) {
+      alert("Error fetching user data.");
+      return;
+    }
+
+    const isAdmin = userData.role === "admin";
+    const isServiceProvider = userData.role === "service_provider";
 
     // ✅ Allow admins to view any profile
     if (isAdmin) {
@@ -42,7 +48,7 @@ async function loadProfile() {
     const profileSnap = await getDoc(profileRef);
 
     if (profileSnap.exists()) {
-      displayProfile(profileSnap.data(), isAdmin);
+      displayProfile(profileSnap.data(), isAdmin, isServiceProvider, profileId);
     } else {
       document.getElementById("profile-container").innerHTML = `<p style="color: red;">Profile not found</p>`;
     }
@@ -79,7 +85,7 @@ async function getAssignedUser(serviceProviderId) {
 }
 
 // ✅ Function to Display Profile Data
-function displayProfile(profile, isAdmin) {
+function displayProfile(profile, isAdmin, isServiceProvider, profileId) {
   document.getElementById("profile-name").textContent = profile.username || "N/A";
   document.getElementById("profile-phone").textContent = profile.phone || "N/A";
   document.getElementById("profile-address").textContent = profile.address || "N/A";
@@ -100,6 +106,38 @@ function displayProfile(profile, isAdmin) {
   } else {
     document.getElementById("gov-id-section").style.display = "none";
   }
+
+  // ✅ Enable Edit Profile for Admins & Users Editing Their Own Profile
+  if (isAdmin || profileId === auth.currentUser.uid) {
+    document.getElementById("edit-profile-btn").style.display = "block";
+    document.getElementById("edit-profile-btn").onclick = () => enableProfileEditing(profileId);
+  }
+}
+
+// ✅ Enable Profile Editing
+function enableProfileEditing(profileId) {
+  document.getElementById("profile-name").contentEditable = true;
+  document.getElementById("profile-phone").contentEditable = true;
+  document.getElementById("profile-address").contentEditable = true;
+  document.getElementById("save-profile-btn").style.display = "block";
+  document.getElementById("edit-profile-btn").style.display = "none";
+
+  document.getElementById("save-profile-btn").onclick = async () => {
+    const updatedData = {
+      username: document.getElementById("profile-name").textContent,
+      phone: document.getElementById("profile-phone").textContent,
+      address: document.getElementById("profile-address").textContent,
+    };
+
+    try {
+      await updateDoc(doc(db, "users", profileId), updatedData);
+      alert("Profile updated successfully!");
+      location.reload();
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      alert("Error updating profile. Please try again.");
+    }
+  };
 }
 
 // ✅ Automatically Load Profile when User Signs In
@@ -111,3 +149,4 @@ auth.onAuthStateChanged((user) => {
     window.location.href = "signin.html";
   }
 });
+    
