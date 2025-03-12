@@ -31,12 +31,6 @@ async function loadUserProfile() {
     document.getElementById("username").value = userData.username;
     document.getElementById("phone").value = userData.phone;
     document.getElementById("address").value = userData.address;
-
-    if (userData.phone && userData.address) {
-      document.getElementById("section-1").classList.add("hidden");
-      document.getElementById("section-2").classList.remove("hidden");
-      document.getElementById("section-3").classList.remove("hidden");
-    }
   }
 }
 
@@ -51,12 +45,7 @@ async function checkSubscription() {
 
     document.getElementById("plan").innerText = subscriptionPlan;
     document.getElementById("remaining-requests").innerText = remainingRequests;
-
-    if (remainingRequests <= 0 && subscriptionPlan === "Free") {
-      alert("You have reached your free service limit. Upgrade to Gold.");
-    }
   } else {
-    // Auto-assign Free Plan if not subscribed
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 5
@@ -77,12 +66,16 @@ document.getElementById("request-service-form").addEventListener("submit", async
   const service = document.getElementById("service").value;
   const serviceProvider = await autoAssignServiceProvider();
 
+  if (!serviceProvider) {
+    alert("No Service Provider Available.");
+    return;
+  }
+
   const docRef = await addDoc(collection(db, "services"), {
     serviceName: service,
     requestedBy: userId,
     assignedTo: serviceProvider,
-    status: "Assigned",
-    requestDate: new Date().toLocaleString()
+    status: "Assigned"
   });
 
   latestServiceId = docRef.id;
@@ -90,10 +83,11 @@ document.getElementById("request-service-form").addEventListener("submit", async
     remainingRequests: remainingRequests - 1
   });
 
-  alert("Service Requested and Assigned!");
+  alert("Service Requested Successfully!");
   location.reload();
 });
 
+// ✅ Section 4: Auto Assign Service Provider
 async function autoAssignServiceProvider() {
   const q = query(collection(db, "users"), where("role", "==", "service_provider"));
   const providers = await getDocs(q);
@@ -101,11 +95,10 @@ async function autoAssignServiceProvider() {
   if (!providers.empty) {
     return providers.docs[0].id;
   }
-  alert("No service provider available.");
   return null;
 }
 
-// ✅ Section 4: Load Services
+// ✅ Section 5: Load Services
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -119,9 +112,7 @@ async function loadUserServices() {
 
     if (data.assignedTo) {
       const providerDoc = await getDoc(doc(db, "users", data.assignedTo));
-      if (providerDoc.exists()) {
-        providerProfile = providerDoc.data().username;
-      }
+      providerProfile = providerDoc.data().username;
     }
 
     container.innerHTML += `
@@ -129,9 +120,7 @@ async function loadUserServices() {
         <p><b>Service:</b> ${data.serviceName}</p>
         <p><b>Status:</b> ${data.status}</p>
         <p><b>Service Provider:</b> ${providerProfile}</p>
-        <p><b>Request Date:</b> ${data.requestDate}</p>
         <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
-        <a href="profile.html?id=${data.assignedTo}" target="_blank">View Provider Profile</a>
       </div>
     `;
 
@@ -142,13 +131,14 @@ async function loadUserServices() {
   });
 }
 
+// ✅ Section 6: Cancel Service
 window.cancelService = async (serviceId) => {
   await updateDoc(doc(db, "services", serviceId), { status: "Cancelled" });
   alert("Service Cancelled!");
   location.reload();
 };
 
-// ✅ Section 5: Feedback
+// ✅ Section 7: Submit Feedback
 document.getElementById("feedback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -156,23 +146,21 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   const feedback = document.getElementById("feedback").value;
 
   await updateDoc(doc(db, "services", latestServiceId), {
-    feedback,
-    rating,
-    status: "Closed"
+    feedback, rating, status: "Closed"
   });
 
   alert("Feedback Submitted!");
   location.reload();
 };
 
-// ✅ Section 6: Subscribe to Gold Plan
+// ✅ Section 8: Upgrade to Gold
 window.subscribeGold = async () => {
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
     remainingRequests: 35
   });
 
-  alert("Gold Plan Activated. You now have 35 requests.");
+  alert("Gold Plan Activated.");
   location.reload();
 };
-      
+                                                   
