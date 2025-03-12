@@ -1,15 +1,14 @@
 import { auth, db } from "./firebase.js";
 import {
-  doc, setDoc, getDoc, collection, addDoc, query, where, getDocs, updateDoc
+  doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId;
-let subscriptionPlan;
-let remainingRequests;
-let subscriptionStatus;
+let subscriptionPlan = "Free"; // Default Plan
+let remainingRequests = 5; // Default Free Plan Requests
+let subscriptionStatus = "Active"; // Default status
 
-// Check authentication
+// ✅ Authenticate User
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("You are not signed in. Redirecting...");
@@ -18,84 +17,76 @@ auth.onAuthStateChanged(async (user) => {
   }
 
   userId = user.uid;
-  await checkSubscription();
   await loadUserProfile();
+  await checkSubscription();
   await loadUserServices();
 });
 
-// ==========================
-// ✅ Section 1: Complete Profile
-// ==========================
+// ✅ Load Profile
 async function loadUserProfile() {
   const userDoc = await getDoc(doc(db, "users", userId));
 
   if (userDoc.exists()) {
     const userData = userDoc.data();
-    document.getElementById("username").value = userData.username;
-    document.getElementById("phone").value = userData.phone;
-    document.getElementById("address").value = userData.address;
+    document.getElementById("username").value = userData.username || "";
+    document.getElementById("phone").value = userData.phone || "";
+    document.getElementById("address").value = userData.address || "";
 
     if (userData.phone && userData.address) {
       document.getElementById("section-1").classList.add("hidden");
       document.getElementById("section-2").classList.remove("hidden");
       document.getElementById("section-3").classList.remove("hidden");
+      document.getElementById("section-5").classList.remove("hidden"); // Subscription section
     }
   }
 }
 
-document.getElementById("profile-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
+// ✅ Check Subscription & Update UI
+async function checkSubscription() {
+  const subDoc = await getDoc(doc(db, "subscriptions", userId));
 
-  const username = document.getElementById("username").value;
-  const phone = document.getElementById("phone").value;
-  const address = document.getElementById("address").value;
+  if (subDoc.exists()) {
+    const data = subDoc.data();
+    subscriptionPlan = data.plan;
+    remainingRequests = data.remainingRequests;
+    subscriptionStatus = data.status || "Active"; // Default to Active if missing
 
-  await setDoc(doc(db, "users", userId), {
-    username,
-    phone,
-    address,
-    role: "user"
-  }, { merge: true });
+    document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
+    document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
 
-  alert("Profile Updated!");
-  location.reload();
-});
-
-// ==========================
-// ✅ Section 2: Request Service
-// ==========================
-document.getElementById("request-service-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const service = document.getElementById("service").value;
-  const serviceProvider = await autoAssignServiceProvider();
-
-  const docRef = await addDoc(collection(db, "services"), {
-    serviceName: service,
-    requestedBy: userId,
-    assignedTo: serviceProvider,
-    status: "Assigned"
-  });
-
-  latestServiceId = docRef.id;
-  alert("Service Requested and Assigned!");
-  location.reload();
-});
-
-async function autoAssignServiceProvider() {
-  const q = query(collection(db, "users"), where("role", "==", "service_provider"));
-  const providers = await getDocs(q);
-
-  if (!providers.empty) {
-    return providers.docs[0].id;
+    // 🚀 Update button text & disable if pending/approved
+    const upgradeBtn = document.getElementById("upgrade-btn");
+    if (subscriptionStatus === "Pending") {
+      upgradeBtn.innerText = "Pending Approval";
+      upgradeBtn.disabled = true;
+    } else if (subscriptionPlan === "Gold") {
+      upgradeBtn.innerText = "Gold Plan Active";
+      upgradeBtn.disabled = true;
+    }
+  } else {
+    // 🚀 If no subscription, assign Free Plan automatically
+    await setDoc(doc(db, "subscriptions", userId), {
+      plan: "Free",
+      remainingRequests: 5,
+      status: "Active"
+    });
+    location.reload();
   }
-  alert("No service provider available.");
-  return null;
 }
 
-// ==========================
-// ✅ Section 3: Track Service
-// ==========================
+// ✅ Request Gold Plan (Admin Approval Needed)
+window.requestGoldPlan = async () => {
+  await setDoc(doc(db, "subscriptions", userId), {
+    plan: "Gold",
+    remainingRequests: 35,
+    status: "Pending"
+  });
+
+  alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
+  location.reload();
+};
+
+// ✅ Load User Services
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -132,20 +123,18 @@ async function loadUserServices() {
 
     if (data.status === "Completed") {
       document.getElementById("section-4").classList.remove("hidden");
-      latestServiceId = docSnap.id;
     }
   });
 }
 
+// ✅ Cancel Service
 window.cancelService = async (serviceId) => {
   await updateDoc(doc(db, "services", serviceId), { status: "Cancelled" });
   alert("Service Cancelled!");
   location.reload();
 };
 
-// ==========================
-// ✅ Section 4: Feedback
-// ==========================
+// ✅ Submit Feedback
 document.getElementById("feedback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -161,49 +150,3 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   alert("Feedback Submitted!");
   location.reload();
 });
-
-// ✅ Section 1: Check Subscription & Update UI
-async function checkSubscription() {
-  const subDoc = await getDoc(doc(db, "subscriptions", userId));
-
-  if (subDoc.exists()) {
-    const data = subDoc.data();
-    subscriptionPlan = data.plan;
-    remainingRequests = data.remainingRequests;
-    subscriptionStatus = data.status || "Active"; // Default to Active
-
-    document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
-    document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
-
-    // 🚀 Show correct button based on subscription status
-    if (subscriptionStatus === "Pending") {
-      document.getElementById("upgrade-btn").innerText = "Pending Approval";
-      document.getElementById("upgrade-btn").disabled = true;
-    } else if (subscriptionPlan === "Gold") {
-      document.getElementById("upgrade-btn").innerText = "Gold Plan Active";
-      document.getElementById("upgrade-btn").disabled = true;
-    }
-  } else {
-    // 🚀 If no subscription, assign Free Plan
-    await setDoc(doc(db, "subscriptions", userId), {
-      plan: "Free",
-      remainingRequests: 5,
-      status: "Active"
-    });
-    location.reload();
-  }
-}
-
-// ✅ Section 2: Request Gold Plan (Admin Approval Needed)
-document.getElementById("upgrade-btn").addEventListener("click", async () => {
-  await setDoc(doc(db, "subscriptions", userId), {
-    plan: "Gold",
-    remainingRequests: 35,
-    status: "Pending"
-  });
-
-  alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
-  location.reload();
-});
-
-        
