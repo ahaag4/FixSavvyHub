@@ -187,7 +187,11 @@ window.cancelService = async (serviceId) => {
   alert("Service Cancelled!");
   location.reload();
 };
-
+// ✅ Set latestServiceId when feedback button is clicked
+window.openFeedbackForm = (serviceId) => {
+  latestServiceId = serviceId;
+  alert(`Feedback enabled for service: ${latestServiceId}`);
+};
 // ✅ Submit Feedback
 document.getElementById("feedback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
