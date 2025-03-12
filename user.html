@@ -57,12 +57,12 @@
   <h2>Request a Service</h2>
   <form id="request-service-form">
     <label>Service:</label>
-        <select id="service" required>
+    <select id="service" required>
       <option value="" disabled selected>Select a service</option>
       <option value="Plumbing">Plumbing</option>
       <option value="Electrician">Electrician</option>
       <option value="Carpenter">Carpenter</option>
-        </select>><br><br>
+    </select><br><br>
     <button type="submit">Request Service</button>
   </form>
 </section>
@@ -87,11 +87,9 @@
   <h2>Your Subscription</h2>
   <p><b>Plan:</b> <span id="plan">-</span></p>
   <p><b>Remaining Requests:</b> <span id="remaining-requests">-</span></p>
-  <button onclick="subscribeGold()">Upgrade to Gold (₹199/month)</button>
+  <button id="upgrade-btn" onclick="requestGoldPlan()">Upgrade to Gold (₹199/month)</button>
 </section>
 
-  
-  
 <script type="module" src="/assets/js/userDashboard.js"></script>
 </body>
 </html>
