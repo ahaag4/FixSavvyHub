@@ -1,11 +1,9 @@
 import { auth, db } from "./firebase.js";
 import {
-  doc, getDoc, getDocs, collection, query, where, updateDoc, deleteDoc
+  doc, getDoc, getDocs, collection, query, where, updateDoc, deleteDoc, setDoc
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-// ==========================
-// ✅ Admin Dashboard Initialization
-// ==========================
+// ✅ Authenticate Admin
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("Not signed in. Redirecting...");
@@ -19,9 +17,7 @@ auth.onAuthStateChanged(async (user) => {
   loadAllStats();
 });
 
-// ==========================
-// ✅ Load All Users
-// ==========================
+// ✅ Section 1: Load All Users
 async function loadAllUsers() {
   const usersDiv = document.getElementById("all-users");
   usersDiv.innerHTML = `<p>Loading...</p>`;
@@ -57,9 +53,7 @@ window.deleteUser = async function(userId) {
   }
 }
 
-// ==========================
-// ✅ Load All Service Providers
-// ==========================
+// ✅ Section 2: Load All Service Providers
 async function loadAllProviders() {
   const providersDiv = document.getElementById("all-providers");
   providersDiv.innerHTML = `<p>Loading...</p>`;
@@ -72,12 +66,11 @@ async function loadAllProviders() {
     const data = doc.data();
     providersDiv.innerHTML += `
       <div>
-        <p><b>UserID:</b> ${data.providerID}</p>
         <p><b>Name:</b> ${data.username}</p>
         <p><b>Phone:</b> ${data.phone}</p>
         <p><b>Gov ID:</b> <a href="${data.govID}" target="_blank">View ID</a></p>
         <p><b>Location:</b> ${data.address}</p>
-        <button onclick="viewProfile('${doc.id}')">View Profile</button>
+        <button onclick="approveGovID('${doc.id}')">Approve Gov ID</button>
         <button onclick="deleteUser('${doc.id}')">Delete Provider</button>
       </div>
       <hr>
@@ -85,9 +78,13 @@ async function loadAllProviders() {
   });
 }
 
-// ==========================
-// ✅ Load All Service Requests
-// ==========================
+window.approveGovID = async function(userId) {
+  await updateDoc(doc(db, "users", userId), { govIDApproved: true });
+  alert("Gov ID Approved.");
+  loadAllProviders();
+}
+
+// ✅ Section 3: Load All Service Requests
 async function loadAllRequests() {
   const requestsDiv = document.getElementById("all-requests");
   requestsDiv.innerHTML = `<p>Loading...</p>`;
@@ -103,9 +100,6 @@ async function loadAllRequests() {
         <p><b>Requested By:</b> ${data.requestedBy}</p>
         <p><b>Assigned To:</b> ${data.assignedTo || "Unassigned"}</p>
         <p><b>Status:</b> ${data.status}</p>
-        <p><b>Request Date:</b> ${data.requestDate || "N/A"}</p>
-        <p><b>Feedback:</b> ${data.feedback || "No Feedback"}</p>
-        <p><b>Rating:</b> ${data.rating || "Not Rated"}</p>
         <button onclick="reassignService('${doc.id}')">Reassign</button>
         <button onclick="changeStatus('${doc.id}')">Change Status</button>
       </div>
@@ -127,9 +121,8 @@ window.changeStatus = async function(serviceId) {
   alert("Status Changed!");
   loadAllRequests();
 }
-// ==========================
-// ✅ Load All Service Requests for subscribe 
-// ==========================
+
+// ✅ Section 4: Manage Subscriptions
 window.subscribeUser = async (userId) => {
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
@@ -138,11 +131,9 @@ window.subscribeUser = async (userId) => {
 
   alert("User Upgraded to Gold Plan.");
   location.reload();
-};
+}
 
-// ==========================
-// ✅ Dashboard Stats
-// ==========================
+// ✅ Section 5: Load Dashboard Stats
 async function loadAllStats() {
   const users = await getDocs(collection(db, "users"));
   const providers = await getDocs(query(collection(db, "users"), where("role", "==", "service_provider")));
@@ -153,9 +144,7 @@ async function loadAllStats() {
   document.getElementById("total-requests").textContent = requests.size;
 }
 
-// ==========================
-// ✅ Logout
-// ==========================
+// ✅ Section 6: Logout
 window.logout = function() {
   auth.signOut();
   window.location.href = "signin.html";
