@@ -5,9 +5,9 @@ import {
 
 let userId;
 let latestServiceId;
-let subscriptionPlan = "Free"; // Default Plan
-let remainingRequests = 5; // Default Free Plan Requests
-let subscriptionStatus = "Active"; // Default status
+let subscriptionPlan = "Free";
+let remainingRequests = 5;
+let subscriptionStatus = "Active";
 
 // ✅ Authenticate User
 auth.onAuthStateChanged(async (user) => {
@@ -37,7 +37,7 @@ async function loadUserProfile() {
       document.getElementById("section-1").classList.add("hidden");
       document.getElementById("section-2").classList.remove("hidden");
       document.getElementById("section-3").classList.remove("hidden");
-      document.getElementById("section-5").classList.remove("hidden"); // Subscription section
+      document.getElementById("section-5").classList.remove("hidden");
     }
   }
 }
@@ -50,22 +50,25 @@ async function checkSubscription() {
     const data = subDoc.data();
     subscriptionPlan = data.plan;
     remainingRequests = data.remainingRequests;
-    subscriptionStatus = data.status || "Active"; // Default to Active if missing
+    subscriptionStatus = data.status || "Active";
 
     document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
     document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
 
-    // 🚀 Update button text & disable if pending/approved
     const upgradeBtn = document.getElementById("upgrade-btn");
-    if (subscriptionStatus === "Pending") {
-      upgradeBtn.innerText = "Pending Approval";
-      upgradeBtn.disabled = true;
-    } else if (subscriptionPlan === "Gold") {
-      upgradeBtn.innerText = "Gold Plan Active";
-      upgradeBtn.disabled = true;
+    if (upgradeBtn) {
+      if (subscriptionStatus === "Pending") {
+        upgradeBtn.innerText = "Pending Approval";
+        upgradeBtn.disabled = true;
+      } else if (subscriptionPlan === "Gold") {
+        upgradeBtn.innerText = "Gold Plan Active";
+        upgradeBtn.disabled = true;
+      } else {
+        upgradeBtn.innerText = "Upgrade to Gold (₹199/month)";
+        upgradeBtn.disabled = false;
+      }
     }
   } else {
-    // 🚀 If no subscription, assign Free Plan automatically
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 5,
@@ -90,6 +93,11 @@ window.requestGoldPlan = async () => {
 // ✅ Request Service & Reduce Limit
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+
+  if (subscriptionStatus === "Pending") {
+    alert("Your subscription upgrade is pending approval. Please wait for admin approval before requesting a service.");
+    return;
+  }
 
   if (remainingRequests <= 0) {
     alert("Request limit reached. Upgrade to Gold.");
@@ -196,4 +204,3 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   alert("Feedback Submitted!");
   location.reload();
 });
-                                                          
