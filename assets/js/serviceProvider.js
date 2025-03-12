@@ -156,5 +156,5 @@ async function loadSummary() {
 }
 
 // ✅ Section 6: View Profile
-document.getElementById("view-profile").href = `profile.html?id=${userId}`;
+document.getElementById("view-profile").href = `profile.html`;
   
