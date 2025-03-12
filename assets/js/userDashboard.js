@@ -88,7 +88,50 @@ window.requestGoldPlan = async () => {
   alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
   location.reload();
 };
+// ✅ Request Service & Reduce Limit
+document.getElementById("request-service-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
 
+  if (remainingRequests <= 0) {
+    alert("Request limit reached. Upgrade to Gold.");
+    return;
+  }
+
+  const service = document.getElementById("service").value;
+  const serviceProvider = await autoAssignServiceProvider();
+
+  if (!serviceProvider) {
+    alert("No available service providers. Try again later.");
+    return;
+  }
+
+  const docRef = await addDoc(collection(db, "services"), {
+    serviceName: service,
+    requestedBy: userId,
+    assignedTo: serviceProvider,
+    status: "Assigned"
+  });
+
+  latestServiceId = docRef.id;
+
+  // 🚀 Reduce Remaining Requests
+  await updateDoc(doc(db, "subscriptions", userId), {
+    remainingRequests: remainingRequests - 1
+  });
+
+  alert("Service Requested and Assigned!");
+  location.reload();
+});
+
+async function autoAssignServiceProvider() {
+  const q = query(collection(db, "users"), where("role", "==", "service_provider"));
+  const providers = await getDocs(q);
+
+  if (!providers.empty) {
+    return providers.docs[0].id;
+  }
+  return null;
+}
 document.getElementById("profile-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -208,3 +251,4 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   location.reload();
 });
 
+    
