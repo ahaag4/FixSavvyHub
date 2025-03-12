@@ -113,7 +113,7 @@ async function loadAllRequests() {
         <button onclick="reassignService('${serviceId}')">Reassign</button>
         <button onclick="changeStatus('${serviceId}')">Change Status</button>
         ${
-          data.status === "Completed" || data.status === "Cancelled"
+          data.status === "Completed" || data.status === "Cancelled" || data.status === "Closed"
             ? `<button onclick="deleteServiceRequest('${serviceId}')">Delete</button>`
             : ""
         }
