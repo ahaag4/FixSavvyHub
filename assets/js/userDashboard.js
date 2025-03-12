@@ -5,10 +5,10 @@ import {
 
 let userId;
 let latestServiceId;
-let subscriptionPlan = "Free"; // Default
-let remainingRequests = 5; // Default Free Plan Limit
+let subscriptionPlan;
+let remainingRequests;
 
-// ✅ Authenticate User
+// ✅ Check Authentication
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("You are not signed in. Redirecting...");
@@ -22,7 +22,7 @@ auth.onAuthStateChanged(async (user) => {
   await loadUserServices();
 });
 
-// ✅ **Section 1: Load & Update Profile**
+// ✅ Section 1: Complete Profile
 async function loadUserProfile() {
   const userDoc = await getDoc(doc(db, "users", userId));
 
@@ -47,13 +47,18 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   const phone = document.getElementById("phone").value;
   const address = document.getElementById("address").value;
 
-  await setDoc(doc(db, "users", userId), { username, phone, address, role: "user" }, { merge: true });
+  await setDoc(doc(db, "users", userId), {
+    username,
+    phone,
+    address,
+    role: "user"
+  }, { merge: true });
 
   alert("Profile Updated!");
   location.reload();
 });
 
-// ✅ **Section 2: Check Subscription**
+// ✅ Section 2: Check Subscription
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
 
@@ -70,12 +75,15 @@ async function checkSubscription() {
     }
   } else {
     // Auto-assign Free Plan if not subscribed
-    await setDoc(doc(db, "subscriptions", userId), { plan: "Free", remainingRequests: 5 });
+    await setDoc(doc(db, "subscriptions", userId), {
+      plan: "Free",
+      remainingRequests: 5
+    });
     location.reload();
   }
 }
 
-// ✅ **Section 3: Request Service**
+// ✅ Section 3: Request Service
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -87,6 +95,11 @@ document.getElementById("request-service-form").addEventListener("submit", async
   const service = document.getElementById("service").value;
   const serviceProvider = await autoAssignServiceProvider();
 
+  if (!serviceProvider) {
+    alert("No available service providers. Try again later.");
+    return;
+  }
+
   const docRef = await addDoc(collection(db, "services"), {
     serviceName: service,
     requestedBy: userId,
@@ -95,7 +108,9 @@ document.getElementById("request-service-form").addEventListener("submit", async
   });
 
   latestServiceId = docRef.id;
-  await updateDoc(doc(db, "subscriptions", userId), { remainingRequests: remainingRequests - 1 });
+  await updateDoc(doc(db, "subscriptions", userId), {
+    remainingRequests: remainingRequests - 1
+  });
 
   alert("Service Requested and Assigned!");
   location.reload();
@@ -108,11 +123,10 @@ async function autoAssignServiceProvider() {
   if (!providers.empty) {
     return providers.docs[0].id;
   }
-  alert("No service provider available.");
   return null;
 }
 
-// ✅ **Section 4: Track Services**
+// ✅ Section 4: Track Service
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -160,7 +174,7 @@ window.cancelService = async (serviceId) => {
   location.reload();
 };
 
-// ✅ **Section 5: Feedback**
+// ✅ Section 5: Feedback
 document.getElementById("feedback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -175,12 +189,16 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
 
   alert("Feedback Submitted!");
   location.reload();
-};
+});
 
-// ✅ **Section 6: Subscribe to Gold Plan**
+// ✅ Section 6: Subscribe to Gold Plan
 window.subscribeGold = async () => {
-  await setDoc(doc(db, "subscriptions", userId), { plan: "Gold", remainingRequests: 35 });
+  await setDoc(doc(db, "subscriptions", userId), {
+    plan: "Gold",
+    remainingRequests: 35
+  });
 
   alert("Gold Plan Activated. You now have 35 requests.");
   location.reload();
 };
+  
