@@ -192,13 +192,15 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   location.reload();
 });
 
-// ✅ Section 6: Subscribe to Gold Plan
-window.subscribeGold = async () => {
+// ✅ Section 6: Request Gold Plan (Pending Approval)
+window.requestGoldPlan = async () => {
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
-    remainingRequests: 35
+    remainingRequests: 35,
+    status: "Pending"
   });
 
-  alert("Gold Plan Activated. You now have 35 requests.");
+  alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
   location.reload();
 };
+
