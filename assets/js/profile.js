@@ -18,22 +18,22 @@ async function loadProfile() {
     const userDoc = await getDoc(doc(db, "users", user.uid));
     const userData = userDoc.exists() ? userDoc.data() : null;
     const isAdmin = userData?.role === "admin";
+    const isServiceProvider = userData?.role === "service_provider";
 
     // ✅ Allow admins to view any profile
     if (isAdmin) {
       if (!profileId) profileId = user.uid;
+    } else if (profileId === user.uid || !profileId) {
+      profileId = user.uid; // Users can always view their own profile
     } else {
-      // ✅ If user is not admin, check if they are allowed to view this profile
-      if (!profileId || profileId === user.uid) {
-        profileId = user.uid;
-      } else {
-        // ✅ Check if this profile is their assigned service provider
-        const assignedProvider = await getAssignedProvider(user.uid);
-        if (profileId !== assignedProvider) {
-          alert("You are not authorized to view this profile.");
-          window.location.href = "dashboard.html";
-          return;
-        }
+      // ✅ Check if the user is viewing their assigned service provider
+      const assignedProvider = await getAssignedProvider(user.uid);
+      const assignedUser = await getAssignedUser(user.uid);
+
+      if (profileId !== assignedProvider && profileId !== assignedUser) {
+        alert("You are not authorized to view this profile.");
+        window.location.href = "dashboard.html";
+        return;
       }
     }
 
@@ -52,16 +52,29 @@ async function loadProfile() {
   }
 }
 
-// ✅ Function to Fetch Assigned Service Provider
+// ✅ Function to Fetch Assigned Service Provider for a User
 async function getAssignedProvider(userId) {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
   const querySnapshot = await getDocs(q);
-  
+
   for (const docSnap of querySnapshot.docs) {
     const data = docSnap.data();
     if (data.assignedTo) return data.assignedTo; // Return the first assigned provider found
   }
-  
+
+  return null;
+}
+
+// ✅ Function to Fetch Assigned User for a Service Provider
+async function getAssignedUser(serviceProviderId) {
+  const q = query(collection(db, "services"), where("assignedTo", "==", serviceProviderId));
+  const querySnapshot = await getDocs(q);
+
+  for (const docSnap of querySnapshot.docs) {
+    const data = docSnap.data();
+    if (data.requestedBy) return data.requestedBy; // Return the first assigned user found
+  }
+
   return null;
 }
 
