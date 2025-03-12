@@ -9,7 +9,7 @@ let subscriptionPlan = "Free";
 let remainingRequests = 5;
 let subscriptionStatus = "Active";
 
-// ✅ Authenticate User
+// ✅ Authenticate User & Check Subscription Expiry
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("You are not signed in. Redirecting...");
@@ -18,30 +18,11 @@ auth.onAuthStateChanged(async (user) => {
   }
 
   userId = user.uid;
-  await loadUserProfile();
+  await checkSubscriptionExpiry(); // ✅ Check expiration first
   await checkSubscription();
-  await checkSubscriptionExpiry(); // ✅ Ensure subscription expiry is checked
+  await loadUserProfile();
   await loadUserServices();
 });
-
-// ✅ Load Profile
-async function loadUserProfile() {
-  const userDoc = await getDoc(doc(db, "users", userId));
-
-  if (userDoc.exists()) {
-    const userData = userDoc.data();
-    document.getElementById("username").value = userData.username || "";
-    document.getElementById("phone").value = userData.phone || "";
-    document.getElementById("address").value = userData.address || "";
-
-    if (userData.phone && userData.address) {
-      document.getElementById("section-1").classList.add("hidden");
-      document.getElementById("section-2").classList.remove("hidden");
-      document.getElementById("section-3").classList.remove("hidden");
-      document.getElementById("section-5").classList.remove("hidden");
-    }
-  }
-}
 
 // ✅ Check Subscription Expiry & Deactivate If Needed
 async function checkSubscriptionExpiry() {
@@ -50,14 +31,14 @@ async function checkSubscriptionExpiry() {
   if (subDoc.exists()) {
     const data = subDoc.data();
     const subscribedDate = data.subscribedDate;
-    const currentDate = new Date();
 
     if (subscribedDate) {
       const subscriptionEndDate = new Date(subscribedDate);
-      subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1);
+      subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1); // Add 1 month
+      const currentDate = new Date();
 
       if (currentDate >= subscriptionEndDate) {
-        // 🚀 Subscription has expired, downgrade to Free plan
+        // 🚀 Subscription expired, downgrade to Free plan
         await updateDoc(doc(db, "subscriptions", userId), {
           plan: "Free",
           remainingRequests: 5,
@@ -109,16 +90,31 @@ async function checkSubscription() {
 
 // ✅ Request Gold Plan (Admin Approval Needed)
 window.requestGoldPlan = async () => {
-  const currentDate = new Date().toISOString(); // Get current date
+  const currentDate = new Date().toISOString(); // ✅ Store subscription start date
 
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
     remainingRequests: 35,
     status: "Pending",
-    subscribedDate: currentDate // ✅ Save subscription start date
+    subscribedDate: currentDate
   });
 
   alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
+  location.reload();
+};
+
+// ✅ Approve Subscription (Admin)
+window.approveSubscription = async (userId) => {
+  const currentDate = new Date().toISOString(); // ✅ Store approval date
+
+  await updateDoc(doc(db, "subscriptions", userId), {
+    plan: "Gold",
+    remainingRequests: 35,
+    status: "Approved",
+    subscribedDate: currentDate // ✅ Store subscription start date
+  });
+
+  alert("User's subscription has been approved.");
   location.reload();
 };
 
