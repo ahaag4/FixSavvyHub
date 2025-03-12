@@ -120,6 +120,13 @@ window.changeStatus = async function (serviceId) {
   alert("Status Changed!");
   loadAllRequests();
 };
+window.deleteService = async function (services) {
+  if (confirm("Are you sure you want to delete this user?")) {
+    await deleteDoc(doc(db, "users", userId,services));
+    alert("User deleted successfully.");
+    loadAllRequests();
+  }
+};
 
 // ✅ Dashboard Stats
 async function loadAllStats() {
@@ -186,4 +193,5 @@ window.logout = function () {
   auth.signOut();
   window.location.href = "signin.html";
 };
-    
+
+      
