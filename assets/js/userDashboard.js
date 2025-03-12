@@ -4,12 +4,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId = null;
+let latestServiceId = null; // Set to null initially
 let subscriptionPlan = "Free";
 let remainingRequests = 5;
 let subscriptionStatus = "Active";
 
-// ✅ Authenticate User & Check Subscription Expiry
+// ✅ Authenticate User
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("You are not signed in. Redirecting...");
@@ -18,36 +18,26 @@ auth.onAuthStateChanged(async (user) => {
   }
 
   userId = user.uid;
-  await checkSubscriptionExpiry(); // ✅ Check expiration first
-  await checkSubscription();
   await loadUserProfile();
+  await checkSubscription();
   await loadUserServices();
 });
 
-// ✅ Check Subscription Expiry & Deactivate If Needed
-async function checkSubscriptionExpiry() {
-  const subDoc = await getDoc(doc(db, "subscriptions", userId));
+// ✅ Load Profile
+async function loadUserProfile() {
+  const userDoc = await getDoc(doc(db, "users", userId));
 
-  if (subDoc.exists()) {
-    const data = subDoc.data();
-    const subscribedDate = data.subscribedDate;
+  if (userDoc.exists()) {
+    const userData = userDoc.data();
+    document.getElementById("username").value = userData.username || "";
+    document.getElementById("phone").value = userData.phone || "";
+    document.getElementById("address").value = userData.address || "";
 
-    if (subscribedDate) {
-      const subscriptionEndDate = new Date(subscribedDate);
-      subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1); // Add 1 month
-      const currentDate = new Date();
-
-      if (currentDate >= subscriptionEndDate) {
-        // 🚀 Subscription expired, downgrade to Free plan
-        await updateDoc(doc(db, "subscriptions", userId), {
-          plan: "Free",
-          remainingRequests: 5,
-          status: "Expired"
-        });
-
-        alert("Your Gold subscription has expired. You have been downgraded to Free plan.");
-        location.reload();
-      }
+    if (userData.phone && userData.address) {
+      document.getElementById("section-1").classList.add("hidden");
+      document.getElementById("section-2").classList.remove("hidden");
+      document.getElementById("section-3").classList.remove("hidden");
+      document.getElementById("section-5").classList.remove("hidden");
     }
   }
 }
@@ -90,31 +80,13 @@ async function checkSubscription() {
 
 // ✅ Request Gold Plan (Admin Approval Needed)
 window.requestGoldPlan = async () => {
-  const currentDate = new Date().toISOString(); // ✅ Store subscription start date
-
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
     remainingRequests: 35,
-    status: "Pending",
-    subscribedDate: currentDate
+    status: "Pending"
   });
 
   alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
-  location.reload();
-};
-
-// ✅ Approve Subscription (Admin)
-window.approveSubscription = async (userId) => {
-  const currentDate = new Date().toISOString(); // ✅ Store approval date
-
-  await updateDoc(doc(db, "subscriptions", userId), {
-    plan: "Gold",
-    remainingRequests: 35,
-    status: "Approved",
-    subscribedDate: currentDate // ✅ Store subscription start date
-  });
-
-  alert("User's subscription has been approved.");
   location.reload();
 };
 
@@ -158,6 +130,16 @@ document.getElementById("request-service-form").addEventListener("submit", async
   location.reload();
 });
 
+async function autoAssignServiceProvider() {
+  const q = query(collection(db, "users"), where("role", "==", "service_provider"));
+  const providers = await getDocs(q);
+
+  if (!providers.empty) {
+    return providers.docs[0].id;
+  }
+  return null;
+}
+
 // ✅ Load User Services
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
@@ -182,11 +164,14 @@ async function loadUserServices() {
       }
     }
 
+    // ✅ Generate service card with "Give Feedback" button for completed services
     serviceContainer.innerHTML += `
       <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
         <p><b>Service:</b> ${data.serviceName}</p>
         <p><b>Status:</b> ${data.status}</p>
         <p><b>Service Provider:</b> ${providerProfile}</p>
+        <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
+        <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
         <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
         ${data.status === "Completed" ? `<button onclick="openFeedbackForm('${docSnap.id}')">Give Feedback</button>` : ""}
       </div>
@@ -208,6 +193,7 @@ window.cancelService = async (serviceId) => {
 // ✅ Open Feedback Form & Set latestServiceId
 window.openFeedbackForm = (serviceId) => {
   latestServiceId = serviceId;
+  alert(`Feedback enabled for service: ${latestServiceId}`);
 };
 
 // ✅ Submit Feedback (Fixed)
@@ -231,3 +217,4 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   alert("Feedback Submitted!");
   location.reload();
 });
+
