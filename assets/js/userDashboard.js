@@ -4,7 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId;
+let latestServiceId = null; // Set to null initially
 let subscriptionPlan = "Free";
 let remainingRequests = 5;
 let subscriptionStatus = "Active";
@@ -164,6 +164,7 @@ async function loadUserServices() {
       }
     }
 
+    // ✅ Generate service card with "Give Feedback" button for completed services
     serviceContainer.innerHTML += `
       <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
         <p><b>Service:</b> ${data.serviceName}</p>
@@ -172,6 +173,7 @@ async function loadUserServices() {
         <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
         <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
         <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
+        ${data.status === "Completed" ? `<button onclick="openFeedbackForm('${docSnap.id}')">Give Feedback</button>` : ""}
       </div>
     `;
 
@@ -187,14 +189,21 @@ window.cancelService = async (serviceId) => {
   alert("Service Cancelled!");
   location.reload();
 };
-// ✅ Set latestServiceId when feedback button is clicked
+
+// ✅ Open Feedback Form & Set latestServiceId
 window.openFeedbackForm = (serviceId) => {
   latestServiceId = serviceId;
   alert(`Feedback enabled for service: ${latestServiceId}`);
 };
-// ✅ Submit Feedback
+
+// ✅ Submit Feedback (Fixed)
 document.getElementById("feedback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+
+  if (!latestServiceId) {
+    alert("Please select a completed service to give feedback.");
+    return;
+  }
 
   const rating = document.getElementById("rating").value;
   const feedback = document.getElementById("feedback").value;
@@ -208,3 +217,4 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   alert("Feedback Submitted!");
   location.reload();
 });
+                                                          
