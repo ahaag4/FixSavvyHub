@@ -17,8 +17,8 @@ auth.onAuthStateChanged(async (user) => {
   }
 
   userId = user.uid;
-  await loadUserProfile();
   await checkSubscription();
+  await loadUserProfile();
   await loadUserServices();
 });
 
@@ -36,6 +36,7 @@ async function loadUserProfile() {
       document.getElementById("section-1").classList.add("hidden");
       document.getElementById("section-2").classList.remove("hidden");
       document.getElementById("section-3").classList.remove("hidden");
+      document.getElementById("section-5").classList.remove("hidden"); // Subscription section
     }
   }
 }
@@ -67,8 +68,8 @@ async function checkSubscription() {
     subscriptionPlan = data.plan;
     remainingRequests = data.remainingRequests;
 
-    document.getElementById("plan").innerText = subscriptionPlan;
-    document.getElementById("remaining-requests").innerText = remainingRequests;
+    document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
+    document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
 
     if (remainingRequests <= 0 && subscriptionPlan === "Free") {
       alert("You have reached your free service limit. Upgrade to Gold.");
@@ -201,4 +202,3 @@ window.subscribeGold = async () => {
   alert("Gold Plan Activated. You now have 35 requests.");
   location.reload();
 };
-  
