@@ -3,9 +3,7 @@ import {
   doc, getDoc, getDocs, collection, query, where, updateDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-// ==========================
 // ✅ Admin Dashboard Initialization
-// ==========================
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("Not signed in. Redirecting...");
@@ -17,11 +15,10 @@ auth.onAuthStateChanged(async (user) => {
   loadAllProviders();
   loadAllRequests();
   loadAllStats();
+  loadSubscriptionRequests(); // ✅ Ensure this function runs
 });
 
-// ==========================
 // ✅ Load All Users
-// ==========================
 async function loadAllUsers() {
   const usersDiv = document.getElementById("all-users");
   usersDiv.innerHTML = `<p>Loading...</p>`;
@@ -45,21 +42,19 @@ async function loadAllUsers() {
   });
 }
 
-window.viewProfile = function(userId) {
+window.viewProfile = function (userId) {
   window.location.href = `profile.html?id=${userId}`;
-}
+};
 
-window.deleteUser = async function(userId) {
+window.deleteUser = async function (userId) {
   if (confirm("Are you sure you want to delete this user?")) {
     await deleteDoc(doc(db, "users", userId));
     alert("User deleted successfully.");
     loadAllUsers();
   }
-}
+};
 
-// ==========================
 // ✅ Load All Service Providers
-// ==========================
 async function loadAllProviders() {
   const providersDiv = document.getElementById("all-providers");
   providersDiv.innerHTML = `<p>Loading...</p>`;
@@ -72,7 +67,7 @@ async function loadAllProviders() {
     const data = doc.data();
     providersDiv.innerHTML += `
       <div>
-        <p><b>UserID:</b> ${data.providerID}</p>
+        <p><b>UserID:</b> ${doc.id}</p>
         <p><b>Name:</b> ${data.username}</p>
         <p><b>Phone:</b> ${data.phone}</p>
         <p><b>Gov ID:</b> <a href="${data.govID}" target="_blank">View ID</a></p>
@@ -85,9 +80,7 @@ async function loadAllProviders() {
   });
 }
 
-// ==========================
 // ✅ Load All Service Requests
-// ==========================
 async function loadAllRequests() {
   const requestsDiv = document.getElementById("all-requests");
   requestsDiv.innerHTML = `<p>Loading...</p>`;
@@ -114,70 +107,21 @@ async function loadAllRequests() {
   });
 }
 
-window.reassignService = async function(serviceId) {
+window.reassignService = async function (serviceId) {
   const newProviderId = prompt("Enter new Service Provider ID:");
   await updateDoc(doc(db, "services", serviceId), { assignedTo: newProviderId });
   alert("Service Reassigned!");
   loadAllRequests();
-}
+};
 
-window.changeStatus = async function(serviceId) {
+window.changeStatus = async function (serviceId) {
   const newStatus = prompt("Enter new Status (In Progress, Completed, Cancelled):");
   await updateDoc(doc(db, "services", serviceId), { status: newStatus });
   alert("Status Changed!");
   loadAllRequests();
-}
-
-// ✅ Section 1: Load Pending Subscription Requests
-async function loadSubscriptionRequests() {
-  const requestsDiv = document.getElementById("subscription-requests");
-  requestsDiv.innerHTML = `<p>Loading...</p>`;
-
-  const q = query(collection(db, "subscriptions"), where("status", "==", "Pending"));
-  const querySnapshot = await getDocs(q);
-  requestsDiv.innerHTML = "";
-
-  if (querySnapshot.empty) {
-    requestsDiv.innerHTML = `<p>No pending requests.</p>`;
-    return;
-  }
-
-  querySnapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-    requestsDiv.innerHTML += `
-      <div>
-        <p><b>User ID:</b> ${docSnap.id}</p>
-        <p><b>Requested Plan:</b> ${data.plan}</p>
-        <button onclick="approveSubscription('${docSnap.id}')">Approve</button>
-        <button onclick="rejectSubscription('${docSnap.id}')">Reject</button>
-      </div>
-      <hr>
-    `;
-  });
-}
-
-// ✅ Section 2: Approve Subscription
-window.approveSubscription = async (userId) => {
-  await updateDoc(doc(db, "subscriptions", userId), {
-    status: "Active"
-  });
-
-  alert("Subscription Approved!");
-  loadSubscriptionRequests();
 };
 
-// ✅ Section 3: Reject Subscription
-window.rejectSubscription = async (userId) => {
-  await deleteDoc(doc(db, "subscriptions", userId));
-
-  alert("Subscription Request Rejected!");
-  loadSubscriptionRequests();
-};
-
-
-// ==========================
 // ✅ Dashboard Stats
-// ==========================
 async function loadAllStats() {
   const users = await getDocs(collection(db, "users"));
   const providers = await getDocs(query(collection(db, "users"), where("role", "==", "service_provider")));
@@ -188,10 +132,58 @@ async function loadAllStats() {
   document.getElementById("total-requests").textContent = requests.size;
 }
 
-// ==========================
+// ✅ Load Pending Subscription Requests
+async function loadSubscriptionRequests() {
+  const requestsDiv = document.getElementById("subscription-requests");
+  requestsDiv.innerHTML = `<p>Loading...</p>`;
+
+  const q = query(collection(db, "subscriptions"), where("status", "==", "Pending"));
+  const querySnapshot = await getDocs(q);
+  requestsDiv.innerHTML = "";
+
+  querySnapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    const userId = docSnap.id;
+
+    requestsDiv.innerHTML += `
+      <div>
+        <p><b>User ID:</b> ${userId}</p>
+        <p><b>Requested Plan:</b> ${data.plan}</p>
+        <button onclick="approveSubscription('${userId}')">Approve</button>
+        <button onclick="rejectSubscription('${userId}')">Reject</button>
+      </div>
+      <hr>
+    `;
+  });
+}
+
+// ✅ Approve Subscription Request
+window.approveSubscription = async function (userId) {
+  await updateDoc(doc(db, "subscriptions", userId), {
+    status: "Approved",
+    plan: "Gold",
+    remainingRequests: 35
+  });
+
+  alert("Subscription Approved!");
+  loadSubscriptionRequests();
+};
+
+// ✅ Reject Subscription Request
+window.rejectSubscription = async function (userId) {
+  await updateDoc(doc(db, "subscriptions", userId), {
+    status: "Rejected",
+    plan: "Free",
+    remainingRequests: 5
+  });
+
+  alert("Subscription Rejected.");
+  loadSubscriptionRequests();
+};
+
 // ✅ Logout
-// ==========================
-window.logout = function() {
+window.logout = function () {
   auth.signOut();
   window.location.href = "signin.html";
-}
+};
+    
