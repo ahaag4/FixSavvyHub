@@ -31,12 +31,6 @@ async function loadUserProfile() {
     document.getElementById("username").value = userData.username;
     document.getElementById("phone").value = userData.phone;
     document.getElementById("address").value = userData.address;
-
-    if (userData.phone && userData.address) {
-      document.getElementById("section-1").classList.add("hidden");
-      document.getElementById("section-2").classList.remove("hidden");
-      document.getElementById("section-3").classList.remove("hidden");
-    }
   }
 }
 
@@ -56,7 +50,6 @@ async function checkSubscription() {
       alert("You have reached your free service limit. Upgrade to Gold.");
     }
   } else {
-    // Auto-assign Free Plan if not subscribed
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 5
@@ -131,11 +124,6 @@ async function loadUserServices() {
         <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
       </div>
     `;
-
-    if (data.status === "Completed") {
-      document.getElementById("section-4").classList.remove("hidden");
-      latestServiceId = docSnap.id;
-    }
   });
 }
 
