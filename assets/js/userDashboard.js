@@ -4,7 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId;
+let latestServiceId = null; // Ensure it's correctly assigned
 let subscriptionPlan = "Free";
 let remainingRequests = 5;
 let subscriptionStatus = "Active";
@@ -42,104 +42,6 @@ async function loadUserProfile() {
   }
 }
 
-// ✅ Check Subscription & Update UI
-async function checkSubscription() {
-  const subDoc = await getDoc(doc(db, "subscriptions", userId));
-
-  if (subDoc.exists()) {
-    const data = subDoc.data();
-    subscriptionPlan = data.plan;
-    remainingRequests = data.remainingRequests;
-    subscriptionStatus = data.status || "Active";
-
-    document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
-    document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
-
-    const upgradeBtn = document.getElementById("upgrade-btn");
-    if (upgradeBtn) {
-      if (subscriptionStatus === "Pending") {
-        upgradeBtn.innerText = "Pending Approval";
-        upgradeBtn.disabled = true;
-      } else if (subscriptionPlan === "Gold") {
-        upgradeBtn.innerText = "Gold Plan Active";
-        upgradeBtn.disabled = true;
-      } else {
-        upgradeBtn.innerText = "Upgrade to Gold (₹199/month)";
-        upgradeBtn.disabled = false;
-      }
-    }
-  } else {
-    await setDoc(doc(db, "subscriptions", userId), {
-      plan: "Free",
-      remainingRequests: 5,
-      status: "Active"
-    });
-    location.reload();
-  }
-}
-
-// ✅ Request Gold Plan (Admin Approval Needed)
-window.requestGoldPlan = async () => {
-  await setDoc(doc(db, "subscriptions", userId), {
-    plan: "Gold",
-    remainingRequests: 35,
-    status: "Pending"
-  });
-
-  alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
-  location.reload();
-};
-
-// ✅ Request Service & Reduce Limit
-document.getElementById("request-service-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  if (subscriptionStatus === "Pending") {
-    alert("Your subscription upgrade is pending approval. Please wait for admin approval before requesting a service.");
-    return;
-  }
-
-  if (remainingRequests <= 0) {
-    alert("Request limit reached. Upgrade to Gold.");
-    return;
-  }
-
-  const service = document.getElementById("service").value;
-  const serviceProvider = await autoAssignServiceProvider();
-
-  if (!serviceProvider) {
-    alert("No available service providers. Try again later.");
-    return;
-  }
-
-  const docRef = await addDoc(collection(db, "services"), {
-    serviceName: service,
-    requestedBy: userId,
-    assignedTo: serviceProvider,
-    status: "Assigned"
-  });
-
-  latestServiceId = docRef.id;
-
-  // 🚀 Reduce Remaining Requests
-  await updateDoc(doc(db, "subscriptions", userId), {
-    remainingRequests: remainingRequests - 1
-  });
-
-  alert("Service Requested and Assigned!");
-  location.reload();
-});
-
-async function autoAssignServiceProvider() {
-  const q = query(collection(db, "users"), where("role", "==", "service_provider"));
-  const providers = await getDocs(q);
-
-  if (!providers.empty) {
-    return providers.docs[0].id;
-  }
-  return null;
-}
-
 // ✅ Load User Services
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
@@ -153,7 +55,7 @@ async function loadUserServices() {
     return;
   }
 
-  querySnapshot.forEach(async (docSnap) => {
+  querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
     let providerProfile = "Not Assigned";
 
@@ -164,6 +66,9 @@ async function loadUserServices() {
       }
     }
 
+    const serviceId = docSnap.id;
+    const isCompleted = data.status === "Completed";
+
     serviceContainer.innerHTML += `
       <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
         <p><b>Service:</b> ${data.serviceName}</p>
@@ -171,30 +76,31 @@ async function loadUserServices() {
         <p><b>Service Provider:</b> ${providerProfile}</p>
         <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
         <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
-        <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
+        <button onclick="cancelService('${serviceId}')">Cancel Service</button>
+        ${isCompleted ? `<button onclick="openFeedbackForm('${serviceId}')">Give Feedback</button>` : ""}
       </div>
     `;
 
-    if (data.status === "Completed") {
+    if (isCompleted) {
       document.getElementById("section-4").classList.remove("hidden");
     }
   });
 }
 
-// ✅ Cancel Service
-window.cancelService = async (serviceId) => {
-  await updateDoc(doc(db, "services", serviceId), { status: "Cancelled" });
-  alert("Service Cancelled!");
-  location.reload();
-};
 // ✅ Set latestServiceId when feedback button is clicked
 window.openFeedbackForm = (serviceId) => {
   latestServiceId = serviceId;
   alert(`Feedback enabled for service: ${latestServiceId}`);
 };
+
 // ✅ Submit Feedback
 document.getElementById("feedback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+
+  if (!latestServiceId) {
+    alert("Please select a completed service before submitting feedback.");
+    return;
+  }
 
   const rating = document.getElementById("rating").value;
   const feedback = document.getElementById("feedback").value;
@@ -208,3 +114,10 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   alert("Feedback Submitted!");
   location.reload();
 });
+
+// ✅ Cancel Service
+window.cancelService = async (serviceId) => {
+  await updateDoc(doc(db, "services", serviceId), { status: "Cancelled" });
+  alert("Service Cancelled!");
+  location.reload();
+};
