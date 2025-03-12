@@ -80,7 +80,16 @@ async function loadAllProviders() {
   });
 }
 
-// ✅ Load All Service Requests
+// ✅ Delete Service Request
+window.deleteServiceRequest = async function (serviceId) {
+  if (confirm("Are you sure you want to delete this service request?")) {
+    await deleteDoc(doc(db, "services", serviceId));
+    alert("Service request deleted successfully.");
+    loadAllRequests(); // Refresh service requests after deletion
+  }
+};
+
+// ✅ Modify Load All Service Requests to Include Delete Button
 async function loadAllRequests() {
   const requestsDiv = document.getElementById("all-requests");
   requestsDiv.innerHTML = `<p>Loading...</p>`;
@@ -88,8 +97,10 @@ async function loadAllRequests() {
   const querySnapshot = await getDocs(collection(db, "services"));
   requestsDiv.innerHTML = "";
 
-  querySnapshot.forEach((doc) => {
-    const data = doc.data();
+  querySnapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    const serviceId = docSnap.id;
+
     requestsDiv.innerHTML += `
       <div>
         <p><b>Service:</b> ${data.serviceName}</p>
@@ -99,13 +110,19 @@ async function loadAllRequests() {
         <p><b>Request Date:</b> ${data.requestDate || "N/A"}</p>
         <p><b>Feedback:</b> ${data.feedback || "No Feedback"}</p>
         <p><b>Rating:</b> ${data.rating || "Not Rated"}</p>
-        <button onclick="reassignService('${doc.id}')">Reassign</button>
-        <button onclick="changeStatus('${doc.id}')">Change Status</button>
+        <button onclick="reassignService('${serviceId}')">Reassign</button>
+        <button onclick="changeStatus('${serviceId}')">Change Status</button>
+        ${
+          data.status === "Completed" || data.status === "Cancelled"
+            ? `<button onclick="deleteServiceRequest('${serviceId}')">Delete</button>`
+            : ""
+        }
       </div>
       <hr>
     `;
   });
 }
+
 
 window.reassignService = async function (serviceId) {
   const newProviderId = prompt("Enter new Service Provider ID:");
@@ -120,13 +137,7 @@ window.changeStatus = async function (serviceId) {
   alert("Status Changed!");
   loadAllRequests();
 };
-window.deleteServiceRequest = async function (serviceId) {
-  if (confirm("Are you sure you want to delete this service request?")) {
-    await deleteDoc(doc(db, "services", serviceId));
-    alert("Service request deleted successfully.");
-    loadAllRequests(); // Refresh service requests after deletion
-  }
-};
+
 
 // ✅ Dashboard Stats
 async function loadAllStats() {
