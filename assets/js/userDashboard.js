@@ -41,7 +41,23 @@ async function loadUserProfile() {
     }
   }
 }
+document.getElementById("profile-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
 
+  const username = document.getElementById("username").value;
+  const phone = document.getElementById("phone").value;
+  const address = document.getElementById("address").value;
+
+  await setDoc(doc(db, "users", userId), {
+    username,
+    phone,
+    address,
+    role: "user"
+  }, { merge: true });
+
+  alert("Profile Updated!");
+  location.reload();
+});
 // ✅ Check Subscription & Update UI
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
