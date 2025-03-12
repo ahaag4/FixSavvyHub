@@ -5,10 +5,10 @@ import {
 
 let userId;
 let latestServiceId;
-let subscriptionPlan;
-let remainingRequests;
+let subscriptionPlan = "Free"; // Default
+let remainingRequests = 5; // Default Free Plan Limit
 
-// Check authentication
+// ✅ Authenticate User
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     alert("You are not signed in. Redirecting...");
@@ -18,22 +18,19 @@ auth.onAuthStateChanged(async (user) => {
 
   userId = user.uid;
   await loadUserProfile();
-  await loadUserServices();
   await checkSubscription();
   await loadUserServices();
 });
 
-// ==========================
-// ✅ Section 1: Complete Profile
-// ==========================
+// ✅ **Section 1: Load & Update Profile**
 async function loadUserProfile() {
   const userDoc = await getDoc(doc(db, "users", userId));
 
   if (userDoc.exists()) {
     const userData = userDoc.data();
-    document.getElementById("username").value = userData.username;
-    document.getElementById("phone").value = userData.phone;
-    document.getElementById("address").value = userData.address;
+    document.getElementById("username").value = userData.username || "";
+    document.getElementById("phone").value = userData.phone || "";
+    document.getElementById("address").value = userData.address || "";
 
     if (userData.phone && userData.address) {
       document.getElementById("section-1").classList.add("hidden");
@@ -50,22 +47,42 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   const phone = document.getElementById("phone").value;
   const address = document.getElementById("address").value;
 
-  await setDoc(doc(db, "users", userId), {
-    username,
-    phone,
-    address,
-    role: "user"
-  }, { merge: true });
+  await setDoc(doc(db, "users", userId), { username, phone, address, role: "user" }, { merge: true });
 
   alert("Profile Updated!");
   location.reload();
 });
 
-// ==========================
-// ✅ Section 2: Request Service
-// ==========================
+// ✅ **Section 2: Check Subscription**
+async function checkSubscription() {
+  const subDoc = await getDoc(doc(db, "subscriptions", userId));
+
+  if (subDoc.exists()) {
+    const data = subDoc.data();
+    subscriptionPlan = data.plan;
+    remainingRequests = data.remainingRequests;
+
+    document.getElementById("plan").innerText = subscriptionPlan;
+    document.getElementById("remaining-requests").innerText = remainingRequests;
+
+    if (remainingRequests <= 0 && subscriptionPlan === "Free") {
+      alert("You have reached your free service limit. Upgrade to Gold.");
+    }
+  } else {
+    // Auto-assign Free Plan if not subscribed
+    await setDoc(doc(db, "subscriptions", userId), { plan: "Free", remainingRequests: 5 });
+    location.reload();
+  }
+}
+
+// ✅ **Section 3: Request Service**
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+
+  if (remainingRequests <= 0 && subscriptionPlan === "Free") {
+    alert("Request limit reached. Upgrade to Gold.");
+    return;
+  }
 
   const service = document.getElementById("service").value;
   const serviceProvider = await autoAssignServiceProvider();
@@ -78,6 +95,8 @@ document.getElementById("request-service-form").addEventListener("submit", async
   });
 
   latestServiceId = docRef.id;
+  await updateDoc(doc(db, "subscriptions", userId), { remainingRequests: remainingRequests - 1 });
+
   alert("Service Requested and Assigned!");
   location.reload();
 });
@@ -93,9 +112,7 @@ async function autoAssignServiceProvider() {
   return null;
 }
 
-// ==========================
-// ✅ Section 3: Track Service
-// ==========================
+// ✅ **Section 4: Track Services**
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -143,9 +160,7 @@ window.cancelService = async (serviceId) => {
   location.reload();
 };
 
-// ==========================
-// ✅ Section 4: Feedback
-// ==========================
+// ✅ **Section 5: Feedback**
 document.getElementById("feedback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -160,38 +175,12 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
 
   alert("Feedback Submitted!");
   location.reload();
-});
-// ✅ Section 6: Subscribe to Gold Plan
+};
+
+// ✅ **Section 6: Subscribe to Gold Plan**
 window.subscribeGold = async () => {
-  await setDoc(doc(db, "subscriptions", userId), {
-    plan: "Gold",
-    remainingRequests: 35
-  });
+  await setDoc(doc(db, "subscriptions", userId), { plan: "Gold", remainingRequests: 35 });
 
   alert("Gold Plan Activated. You now have 35 requests.");
   location.reload();
 };
-// ✅ Section 2: Check Subscription
-async function checkSubscription() {
-  const subDoc = await getDoc(doc(db, "subscriptions", userId));
-
-  if (subDoc.exists()) {
-    const data = subDoc.data();
-    subscriptionPlan = data.plan;
-    remainingRequests = data.remainingRequests;
-
-    document.getElementById("plan").innerText = subscriptionPlan;
-    document.getElementById("remaining-requests").innerText = remainingRequests;
-
-    if (remainingRequests <= 0 && subscriptionPlan === "Free") {
-      alert("You have reached your free service limit. Upgrade to Gold.");
-    }
-  } else {
-    // Auto-assign Free Plan if not subscribed
-    await setDoc(doc(db, "subscriptions", userId), {
-      plan: "Free",
-      remainingRequests: 5
-    });
-    location.reload();
-  }
-}
