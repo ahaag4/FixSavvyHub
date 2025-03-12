@@ -83,6 +83,19 @@
   </form>
 </section>
 
+<section class="section hidden" id="subscription-section">
+  <h2>Choose Your Subscription</h2>
+  <button onclick="subscribePlan('Basic')">Basic Plan (₹299/month - 5 Requests)</button>
+  <button onclick="subscribePlan('Premium')">Premium Plan (₹599/month - Unlimited Requests)</button>
+</section>
+
+<section class="section" id="user-subscription">
+  <h2>Your Subscription</h2>
+  <p><b>Plan:</b> <span id="subscription">-</span></p>
+  <p><b>Remaining Requests:</b> <span id="remaining-requests">-</span></p>
+</section>
+  
+  
 <script type="module" src="/assets/js/userDashboard.js"></script>
 </body>
 </html>
