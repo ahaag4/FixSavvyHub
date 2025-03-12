@@ -128,16 +128,52 @@ window.changeStatus = async function(serviceId) {
   loadAllRequests();
 }
 
-// ✅ Section 4: Manage Subscriptions
-window.subscribeUser = async (userId) => {
-  await setDoc(doc(db, "subscriptions", userId), {
-    plan: "Gold",
-    remainingRequests: 35
+// ✅ Section 1: Load Pending Subscription Requests
+async function loadSubscriptionRequests() {
+  const requestsDiv = document.getElementById("subscription-requests");
+  requestsDiv.innerHTML = `<p>Loading...</p>`;
+
+  const q = query(collection(db, "subscriptions"), where("status", "==", "Pending"));
+  const querySnapshot = await getDocs(q);
+  requestsDiv.innerHTML = "";
+
+  if (querySnapshot.empty) {
+    requestsDiv.innerHTML = `<p>No pending requests.</p>`;
+    return;
+  }
+
+  querySnapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    requestsDiv.innerHTML += `
+      <div>
+        <p><b>User ID:</b> ${docSnap.id}</p>
+        <p><b>Requested Plan:</b> ${data.plan}</p>
+        <button onclick="approveSubscription('${docSnap.id}')">Approve</button>
+        <button onclick="rejectSubscription('${docSnap.id}')">Reject</button>
+      </div>
+      <hr>
+    `;
+  });
+}
+
+// ✅ Section 2: Approve Subscription
+window.approveSubscription = async (userId) => {
+  await updateDoc(doc(db, "subscriptions", userId), {
+    status: "Active"
   });
 
-  alert("User Upgraded to Gold Plan.");
-  location.reload();
-}
+  alert("Subscription Approved!");
+  loadSubscriptionRequests();
+};
+
+// ✅ Section 3: Reject Subscription
+window.rejectSubscription = async (userId) => {
+  await deleteDoc(doc(db, "subscriptions", userId));
+
+  alert("Subscription Request Rejected!");
+  loadSubscriptionRequests();
+};
+
 
 // ==========================
 // ✅ Dashboard Stats
