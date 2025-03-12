@@ -45,7 +45,12 @@ async function checkSubscription() {
 
     document.getElementById("plan").innerText = subscriptionPlan;
     document.getElementById("remaining-requests").innerText = remainingRequests;
+
+    if (remainingRequests <= 0 && subscriptionPlan === "Free") {
+      alert("You have reached your free service limit. Upgrade to Gold.");
+    }
   } else {
+    // Auto-assign Free Plan if not subscribed
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 5
@@ -163,4 +168,4 @@ window.subscribeGold = async () => {
   alert("Gold Plan Activated.");
   location.reload();
 };
-                                                   
+        
