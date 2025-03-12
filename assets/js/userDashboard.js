@@ -31,6 +31,12 @@ async function loadUserProfile() {
     document.getElementById("username").value = userData.username;
     document.getElementById("phone").value = userData.phone;
     document.getElementById("address").value = userData.address;
+
+    if (userData.phone && userData.address) {
+      document.getElementById("section-1").classList.add("hidden");
+      document.getElementById("section-2").classList.remove("hidden");
+      document.getElementById("section-3").classList.remove("hidden");
+    }
   }
 }
 
@@ -50,6 +56,7 @@ async function checkSubscription() {
       alert("You have reached your free service limit. Upgrade to Gold.");
     }
   } else {
+    // Auto-assign Free Plan if not subscribed
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 5
@@ -74,7 +81,8 @@ document.getElementById("request-service-form").addEventListener("submit", async
     serviceName: service,
     requestedBy: userId,
     assignedTo: serviceProvider,
-    status: "Assigned"
+    status: "Assigned",
+    requestDate: new Date().toLocaleString()
   });
 
   latestServiceId = docRef.id;
@@ -121,9 +129,16 @@ async function loadUserServices() {
         <p><b>Service:</b> ${data.serviceName}</p>
         <p><b>Status:</b> ${data.status}</p>
         <p><b>Service Provider:</b> ${providerProfile}</p>
+        <p><b>Request Date:</b> ${data.requestDate}</p>
         <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
+        <a href="profile.html?id=${data.assignedTo}" target="_blank">View Provider Profile</a>
       </div>
     `;
+
+    if (data.status === "Completed") {
+      document.getElementById("section-4").classList.remove("hidden");
+      latestServiceId = docSnap.id;
+    }
   });
 }
 
@@ -160,3 +175,4 @@ window.subscribeGold = async () => {
   alert("Gold Plan Activated. You now have 35 requests.");
   location.reload();
 };
+      
