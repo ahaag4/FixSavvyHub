@@ -32,11 +32,11 @@ async function loadProfile() {
     } else if (profileId === user.uid || !profileId) {
       profileId = user.uid; // Users can always view their own profile
     } else {
-      // ✅ Check if the user is viewing their assigned service provider
+      // ✅ Check if the user is viewing their assigned service provider OR their assigned users
       const assignedProvider = await getAssignedProvider(user.uid);
-      const assignedUser = await getAssignedUser(user.uid);
+      const assignedUsers = await getAssignedUsers(user.uid);
 
-      if (profileId !== assignedProvider && profileId !== assignedUser) {
+      if (profileId !== assignedProvider && !assignedUsers.includes(profileId)) {
         alert("You are not authorized to view this profile.");
         window.location.href = "dashboard.html";
         return;
@@ -65,23 +65,24 @@ async function getAssignedProvider(userId) {
 
   for (const docSnap of querySnapshot.docs) {
     const data = docSnap.data();
-    if (data.assignedTo) return data.assignedTo; // Return the first assigned provider found
+    if (data.assignedTo) return data.assignedTo;
   }
 
   return null;
 }
 
-// ✅ Function to Fetch Assigned User for a Service Provider
-async function getAssignedUser(serviceProviderId) {
+// ✅ Function to Fetch All Assigned Users for a Service Provider
+async function getAssignedUsers(serviceProviderId) {
   const q = query(collection(db, "services"), where("assignedTo", "==", serviceProviderId));
   const querySnapshot = await getDocs(q);
+  let assignedUsers = [];
 
-  for (const docSnap of querySnapshot.docs) {
+  querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
-    if (data.requestedBy) return data.requestedBy; // Return the first assigned user found
-  }
+    if (data.requestedBy) assignedUsers.push(data.requestedBy);
+  });
 
-  return null;
+  return assignedUsers;
 }
 
 // ✅ Function to Display Profile Data
@@ -149,4 +150,4 @@ auth.onAuthStateChanged((user) => {
     window.location.href = "signin.html";
   }
 });
-    
+                                       
