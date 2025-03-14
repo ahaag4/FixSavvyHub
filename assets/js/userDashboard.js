@@ -4,7 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId = null;
+let latestServiceId = null; // Set to null initially
 let subscriptionPlan = "Free";
 let remainingRequests = 1;
 let subscriptionStatus = "Active";
@@ -33,10 +33,6 @@ async function loadUserProfile() {
     document.getElementById("phone").value = userData.phone || "";
     document.getElementById("address").value = userData.address || "";
 
-    if (userData.city) {
-      document.getElementById("city").value = userData.city || "";
-    }
-
     if (userData.phone && userData.address) {
       document.getElementById("section-1").classList.add("hidden");
       document.getElementById("section-2").classList.remove("hidden");
@@ -45,28 +41,24 @@ async function loadUserProfile() {
     }
   }
 }
-
 document.getElementById("profile-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const username = document.getElementById("username").value;
   const phone = document.getElementById("phone").value;
   const address = document.getElementById("address").value;
-  const city = document.getElementById("city").value;
 
   await setDoc(doc(db, "users", userId), {
     username,
     phone,
     address,
-    city,
     role: "user"
   }, { merge: true });
 
   alert("Profile Updated!");
   location.reload();
 });
-
-// ✅ Check Subscription
+// ✅ Check Subscription & Update UI
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
 
@@ -102,7 +94,7 @@ async function checkSubscription() {
   }
 }
 
-// ✅ Request Gold Plan
+// ✅ Request Gold Plan (Admin Approval Needed)
 window.requestGoldPlan = async () => {
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
@@ -114,12 +106,12 @@ window.requestGoldPlan = async () => {
   location.reload();
 };
 
-// ✅ Request Service
+// ✅ Request Service & Reduce Limit
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
   if (subscriptionStatus === "Pending") {
-    alert("Your subscription upgrade is pending approval.");
+    alert("Your subscription upgrade is pending approval. Please wait for admin approval before requesting a service.");
     return;
   }
 
@@ -145,6 +137,7 @@ document.getElementById("request-service-form").addEventListener("submit", async
 
   latestServiceId = docRef.id;
 
+  // 🚀 Reduce Remaining Requests
   await updateDoc(doc(db, "subscriptions", userId), {
     remainingRequests: remainingRequests - 1
   });
@@ -171,6 +164,7 @@ async function autoAssignServiceProvider() {
   return providers.empty ? null : providers.docs[0].id;
 }
 
+
 // ✅ Load User Services
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
@@ -195,15 +189,22 @@ async function loadUserServices() {
       }
     }
 
+    // ✅ Generate service card with "Give Feedback" button for completed services
     serviceContainer.innerHTML += `
       <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
         <p><b>Service:</b> ${data.serviceName}</p>
         <p><b>Status:</b> ${data.status}</p>
         <p><b>Service Provider:</b> ${providerProfile}</p>
+        <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
+        <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
         <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
         ${data.status === "Completed" ? `<button onclick="openFeedbackForm('${docSnap.id}')">Give Feedback</button>` : ""}
       </div>
     `;
+
+    if (data.status === "Completed") {
+      document.getElementById("section-4").classList.remove("hidden");
+    }
   });
 }
 
@@ -214,12 +215,13 @@ window.cancelService = async (serviceId) => {
   location.reload();
 };
 
-// ✅ Open Feedback Form
+// ✅ Open Feedback Form & Set latestServiceId
 window.openFeedbackForm = (serviceId) => {
   latestServiceId = serviceId;
+  alert(`Feedback enabled for service: ${latestServiceId}`);
 };
 
-// ✅ Submit Feedback
+// ✅ Submit Feedback (Fixed)
 document.getElementById("feedback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -240,4 +242,4 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   alert("Feedback Submitted!");
   location.reload();
 });
-  
+
