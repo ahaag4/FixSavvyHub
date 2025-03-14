@@ -64,6 +64,23 @@ async function checkSubscription() {
 
   if (subDoc.exists()) {
     const data = subDoc.data();
+    const currentDate = new Date();
+    const expiryDate = data.expiry ? new Date(data.expiry) : null;
+
+    if (expiryDate && currentDate > expiryDate) {
+      // Subscription expired -> downgrade to Free
+      await setDoc(doc(db, "subscriptions", userId), {
+        plan: "Free",
+        remainingRequests: 1,
+        status: "Active"
+      }, { merge: true });
+
+      alert("Your Gold subscription has expired. Downgraded to Free Plan.");
+      location.reload();
+      return;
+    }
+
+    // If not expired, update UI
     subscriptionPlan = data.plan;
     remainingRequests = data.remainingRequests;
     subscriptionStatus = data.status || "Active";
@@ -77,7 +94,7 @@ async function checkSubscription() {
         upgradeBtn.innerText = "Pending Approval";
         upgradeBtn.disabled = true;
       } else if (subscriptionPlan === "Gold") {
-        upgradeBtn.innerText = "Gold Plan Active";
+        upgradeBtn.innerText = `Gold Plan Active (Expires on ${expiryDate.toDateString()})`;
         upgradeBtn.disabled = true;
       } else {
         upgradeBtn.innerText = "Upgrade to Gold (₹199/month)";
@@ -96,15 +113,20 @@ async function checkSubscription() {
 
 // ✅ Request Gold Plan (Admin Approval Needed)
 window.requestGoldPlan = async () => {
+  const expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + 30); // Set expiry date to 30 days from today
+
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
     remainingRequests: 35,
-    status: "Pending"
+    status: "Pending",
+    expiry: expiryDate.toISOString() // Store expiry as ISO string
   });
 
   alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
   location.reload();
 };
+
 
 // ✅ Request Service & Reduce Limit
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
@@ -242,4 +264,3 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   alert("Feedback Submitted!");
   location.reload();
 });
-
