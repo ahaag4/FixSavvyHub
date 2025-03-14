@@ -34,8 +34,9 @@ async function loadServiceProviderProfile() {
     document.getElementById("username").value = userData.username;
     document.getElementById("phone").value = userData.phone;
     document.getElementById("address").value = userData.address;
+    document.getElementById("service").value = userData.service;
 
-    if (userData.phone && userData.address && userData.govID) {
+    if (userData.phone && userData.address && userData.service && userData.govID) {
       document.getElementById("section-1").classList.add("hidden");
       document.getElementById("section-2").classList.remove("hidden");
       document.getElementById("section-3").classList.remove("hidden");
@@ -51,12 +52,13 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   const username = document.getElementById("username").value;
   const phone = document.getElementById("phone").value;
   const address = document.getElementById("address").value;
+  const address = document.getElementById("service").value;
   const govIDFile = document.getElementById("gov-id").files[0];
 
   const govIDURL = URL.createObjectURL(govIDFile);
 
   await setDoc(doc(db, "users", userId), {
-    username, phone, address,
+    username, phone, address, service,
     govID: govIDURL,
     role: "service_provider"
   }, { merge: true });
