@@ -52,7 +52,7 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   const username = document.getElementById("username").value;
   const phone = document.getElementById("phone").value;
   const address = document.getElementById("address").value;
-  const address = document.getElementById("service").value;
+  const service = document.getElementById("service").value;
   const govIDFile = document.getElementById("gov-id").files[0];
 
   const govIDURL = URL.createObjectURL(govIDFile);
