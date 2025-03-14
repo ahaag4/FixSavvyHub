@@ -4,7 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId = null; // Set to null initially
+let latestServiceId = null;
 let subscriptionPlan = "Free";
 let remainingRequests = 1;
 let subscriptionStatus = "Active";
@@ -41,6 +41,7 @@ async function loadUserProfile() {
     }
   }
 }
+
 document.getElementById("profile-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -58,6 +59,7 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   alert("Profile Updated!");
   location.reload();
 });
+
 // ✅ Check Subscription & Update UI
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
@@ -102,16 +104,17 @@ window.requestGoldPlan = async () => {
     status: "Pending"
   });
 
+  subscriptionPlan = "Gold"; // ✅ Update UI Immediately
   alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
-  location.reload();
+  checkSubscription();
 };
 
-// ✅ Request Service & Reduce Limit
+// ✅ Request Service & Auto-Assign Provider
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
   if (subscriptionStatus === "Pending") {
-    alert("Your subscription upgrade is pending approval. Please wait for admin approval before requesting a service.");
+    alert("Your subscription upgrade is pending approval.");
     return;
   }
 
@@ -124,7 +127,7 @@ document.getElementById("request-service-form").addEventListener("submit", async
   const serviceProvider = await autoAssignServiceProvider();
 
   if (!serviceProvider) {
-    alert("No available service providers. Try again later.");
+    alert("No available service providers nearby.");
     return;
   }
 
@@ -137,7 +140,6 @@ document.getElementById("request-service-form").addEventListener("submit", async
 
   latestServiceId = docRef.id;
 
-  // 🚀 Reduce Remaining Requests
   await updateDoc(doc(db, "subscriptions", userId), {
     remainingRequests: remainingRequests - 1
   });
@@ -146,91 +148,62 @@ document.getElementById("request-service-form").addEventListener("submit", async
   location.reload();
 });
 
+// ✅ Auto-Assign Service Provider Based on Service & Location
 async function autoAssignServiceProvider() {
-  const q = query(collection(db, "users"), where("role", "==", "service_provider"));
+  const serviceType = document.getElementById("service").value;
+
+  const userRef = await getDoc(doc(db, "users", userId));
+  if (!userRef.exists()) return null;
+  const userLocation = userRef.data().location;
+
+  if (!userLocation || !userLocation.lat || !userLocation.lon) {
+    alert("Your location is missing. Update your profile first.");
+    return null;
+  }
+
+  const q = query(collection(db, "users"), where("role", "==", "service_provider"), where("service", "==", serviceType));
   const providers = await getDocs(q);
 
-  if (!providers.empty) {
-    return providers.docs[0].id;
-  }
-  return null;
-}
-
-// ✅ Load User Services
-async function loadUserServices() {
-  const q = query(collection(db, "services"), where("requestedBy", "==", userId));
-  const querySnapshot = await getDocs(q);
-
-  const serviceContainer = document.getElementById("assigned-service");
-  serviceContainer.innerHTML = "";
-
-  if (querySnapshot.empty) {
-    serviceContainer.innerHTML = `<p>No services requested yet.</p>`;
-    return;
+  if (providers.empty) {
+    return null;
   }
 
-  querySnapshot.forEach(async (docSnap) => {
-    const data = docSnap.data();
-    let providerProfile = "Not Assigned";
+  let nearestProvider = null;
+  let minDistance = Infinity;
 
-    if (data.assignedTo) {
-      const providerDoc = await getDoc(doc(db, "users", data.assignedTo));
-      if (providerDoc.exists()) {
-        providerProfile = providerDoc.data().username;
+  providers.forEach((provider) => {
+    const providerData = provider.data();
+    if (providerData.location && providerData.location.lat && providerData.location.lon) {
+      const distance = calculateDistance(userLocation, providerData.location);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestProvider = provider.id;
       }
     }
-
-    // ✅ Generate service card with "Give Feedback" button for completed services
-    serviceContainer.innerHTML += `
-      <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
-        <p><b>Service:</b> ${data.serviceName}</p>
-        <p><b>Status:</b> ${data.status}</p>
-        <p><b>Service Provider:</b> ${providerProfile}</p>
-        <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
-        <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
-        <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
-        ${data.status === "Completed" ? `<button onclick="openFeedbackForm('${docSnap.id}')">Give Feedback</button>` : ""}
-      </div>
-    `;
-
-    if (data.status === "Completed") {
-      document.getElementById("section-4").classList.remove("hidden");
-    }
   });
-}
 
-// ✅ Cancel Service
-window.cancelService = async (serviceId) => {
-  await updateDoc(doc(db, "services", serviceId), { status: "Cancelled" });
-  alert("Service Cancelled!");
-  location.reload();
-};
-
-// ✅ Open Feedback Form & Set latestServiceId
-window.openFeedbackForm = (serviceId) => {
-  latestServiceId = serviceId;
-  alert(`Feedback enabled for service: ${latestServiceId}`);
-};
-
-// ✅ Submit Feedback (Fixed)
-document.getElementById("feedback-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  if (!latestServiceId) {
-    alert("Please select a completed service to give feedback.");
-    return;
+  if (!nearestProvider) {
+    return null;
   }
 
-  const rating = document.getElementById("rating").value;
-  const feedback = document.getElementById("feedback").value;
+  return nearestProvider;
+}
 
-  await updateDoc(doc(db, "services", latestServiceId), {
-    feedback,
-    rating,
-    status: "Closed"
-  });
+// ✅ Calculate Distance (Haversine Formula)
+function calculateDistance(userLoc, providerLoc) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const R = 6371; 
 
-  alert("Feedback Submitted!");
-  location.reload();
-});
+  const lat1 = userLoc.lat, lon1 = userLoc.lon;
+  const lat2 = providerLoc.lat, lon2 = providerLoc.lon;
 
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
