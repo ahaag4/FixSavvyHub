@@ -33,6 +33,10 @@ async function loadUserProfile() {
     document.getElementById("phone").value = userData.phone || "";
     document.getElementById("address").value = userData.address || "";
 
+    if (userData.city) {
+      document.getElementById("city").value = userData.city || "";
+    }
+
     if (userData.phone && userData.address) {
       document.getElementById("section-1").classList.add("hidden");
       document.getElementById("section-2").classList.remove("hidden");
@@ -48,11 +52,13 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   const username = document.getElementById("username").value;
   const phone = document.getElementById("phone").value;
   const address = document.getElementById("address").value;
+  const city = document.getElementById("city").value;
 
   await setDoc(doc(db, "users", userId), {
     username,
     phone,
     address,
+    city,
     role: "user"
   }, { merge: true });
 
@@ -60,7 +66,7 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   location.reload();
 });
 
-// ✅ Check Subscription & Update UI
+// ✅ Check Subscription
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
 
@@ -96,7 +102,7 @@ async function checkSubscription() {
   }
 }
 
-// ✅ Request Gold Plan (Admin Approval Needed)
+// ✅ Request Gold Plan
 window.requestGoldPlan = async () => {
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
@@ -104,12 +110,11 @@ window.requestGoldPlan = async () => {
     status: "Pending"
   });
 
-  subscriptionPlan = "Gold"; // ✅ Update UI Immediately
   alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
-  checkSubscription();
+  location.reload();
 };
 
-// ✅ Request Service & Auto-Assign Provider
+// ✅ Request Service
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -127,7 +132,7 @@ document.getElementById("request-service-form").addEventListener("submit", async
   const serviceProvider = await autoAssignServiceProvider();
 
   if (!serviceProvider) {
-    alert("No available service providers nearby.");
+    alert("No available service providers. Try again later.");
     return;
   }
 
@@ -148,62 +153,91 @@ document.getElementById("request-service-form").addEventListener("submit", async
   location.reload();
 });
 
-// ✅ Auto-Assign Service Provider Based on Service & Location
+// ✅ Auto Assign Service Provider
 async function autoAssignServiceProvider() {
   const serviceType = document.getElementById("service").value;
 
   const userRef = await getDoc(doc(db, "users", userId));
   if (!userRef.exists()) return null;
-  const userLocation = userRef.data().location;
+  const userCity = userRef.data().location;
 
-  if (!userLocation || !userLocation.lat || !userLocation.lon) {
-    alert("Your location is missing. Update your profile first.");
-    return null;
-  }
+  const q = query(collection(db, "users"),
+    where("role", "==", "service_provider"),
+    where("service", "==", serviceType),
+    where("location", "==", userCity)
+  );
 
-  const q = query(collection(db, "users"), where("role", "==", "service_provider"), where("service", "==", serviceType));
   const providers = await getDocs(q);
+  return providers.empty ? null : providers.docs[0].id;
+}
 
-  if (providers.empty) {
-    return null;
+// ✅ Load User Services
+async function loadUserServices() {
+  const q = query(collection(db, "services"), where("requestedBy", "==", userId));
+  const querySnapshot = await getDocs(q);
+
+  const serviceContainer = document.getElementById("assigned-service");
+  serviceContainer.innerHTML = "";
+
+  if (querySnapshot.empty) {
+    serviceContainer.innerHTML = `<p>No services requested yet.</p>`;
+    return;
   }
 
-  let nearestProvider = null;
-  let minDistance = Infinity;
+  querySnapshot.forEach(async (docSnap) => {
+    const data = docSnap.data();
+    let providerProfile = "Not Assigned";
 
-  providers.forEach((provider) => {
-    const providerData = provider.data();
-    if (providerData.location && providerData.location.lat && providerData.location.lon) {
-      const distance = calculateDistance(userLocation, providerData.location);
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestProvider = provider.id;
+    if (data.assignedTo) {
+      const providerDoc = await getDoc(doc(db, "users", data.assignedTo));
+      if (providerDoc.exists()) {
+        providerProfile = providerDoc.data().username;
       }
     }
-  });
 
-  if (!nearestProvider) {
-    return null;
+    serviceContainer.innerHTML += `
+      <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+        <p><b>Service:</b> ${data.serviceName}</p>
+        <p><b>Status:</b> ${data.status}</p>
+        <p><b>Service Provider:</b> ${providerProfile}</p>
+        <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
+        ${data.status === "Completed" ? `<button onclick="openFeedbackForm('${docSnap.id}')">Give Feedback</button>` : ""}
+      </div>
+    `;
+  });
+}
+
+// ✅ Cancel Service
+window.cancelService = async (serviceId) => {
+  await updateDoc(doc(db, "services", serviceId), { status: "Cancelled" });
+  alert("Service Cancelled!");
+  location.reload();
+};
+
+// ✅ Open Feedback Form
+window.openFeedbackForm = (serviceId) => {
+  latestServiceId = serviceId;
+};
+
+// ✅ Submit Feedback
+document.getElementById("feedback-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!latestServiceId) {
+    alert("Please select a completed service to give feedback.");
+    return;
   }
 
-  return nearestProvider;
-}
+  const rating = document.getElementById("rating").value;
+  const feedback = document.getElementById("feedback").value;
 
-// ✅ Calculate Distance (Haversine Formula)
-function calculateDistance(userLoc, providerLoc) {
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const R = 6371; 
+  await updateDoc(doc(db, "services", latestServiceId), {
+    feedback,
+    rating,
+    status: "Closed"
+  });
 
-  const lat1 = userLoc.lat, lon1 = userLoc.lon;
-  const lat2 = providerLoc.lat, lon2 = providerLoc.lon;
-
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  alert("Feedback Submitted!");
+  location.reload();
+});
   
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
