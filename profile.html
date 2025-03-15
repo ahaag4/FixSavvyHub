@@ -35,36 +35,23 @@
       color: #555;
     }
 
-    .profile-card input {
-      width: 100%;
-      padding: 8px;
-      margin: 5px 0;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-    }
-
     .profile-card a {
       text-decoration: none;
       color: #007bff;
     }
 
-    .button-container {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .edit-btn, .save-btn {
+    .download-btn {
       background-color: #007bff;
       color: #fff;
       border: none;
       padding: 10px 20px;
       border-radius: 5px;
       cursor: pointer;
+      text-decoration: none;
       font-size: 16px;
     }
 
-    .edit-btn:hover, .save-btn:hover {
+    .download-btn:hover {
       background-color: #0056b3;
     }
 
@@ -81,24 +68,22 @@
     <a class="back-btn" href="dashboard.html">← Back to Dashboard</a>
 
     <div class="profile-card">
-      <h2>Profile</h2>
-      <p><strong>Username:</strong> <input type="text" id="profile-name" disabled></p>
-      <p><strong>Email:</strong> <input type="text" id="profile-email" disabled></p>
-      <p><strong>Phone:</strong> <input type="text" id="profile-phone" disabled></p>
-      <p><strong>Address:</strong> <input type="text" id="profile-address" disabled></p>
+      <h2 id="profile-name">Loading...</h2>
+      <p><strong>Email:</strong> <span id="profile-email"></span></p>
+      <p><strong>Phone:</strong> <span id="profile-phone"></span></p>
+      <p><strong>Address:</strong> <span id="profile-address"></span></p>
       <p><strong>Role:</strong> <span id="profile-role"></span></p>
-
       <p id="gov-id-section" style="display:none;">
         <strong>Government ID:</strong> <a id="gov-id-link" href="#" target="_blank">View ID</a>
       </p>
-
       <div class="button-container">
         <button class="edit-btn" id="edit-profile-btn">Edit Profile</button>
         <button class="save-btn" id="save-profile-btn" style="display:none;">Save</button>
       </div>
+      <!--<button class="download-btn" onclick="downloadProfile()">Download Profile as PDF</button>-->
     </div>
   </div>
 
-  <script type="module" src="profile.js"></script>
+  <script type="module" src="/assets/js/profile.js"></script>
 </body>
 </html>
