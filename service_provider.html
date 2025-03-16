@@ -20,7 +20,15 @@
     <label>Address:</label>
     <input type="text" id="address" required><br><br>
     <label>Service:</label>
-    <input type="text" id="service" required><br><br>
+    <select id="service" required>
+      <option value="" disabled selected>Select a service</option>
+      <option value="Plumbing">Plumbing</option>
+      <option value="Electrician">Electrician</option>
+      <option value="Carpentry">Carpentry</option>
+      <option value="Painting">Painting</option>
+      <option value="AC Repair">AC Repair</option>
+      <option value="Cleaning">Cleaning</option>
+    </select><br><br>
     <label>Upload Gov ID (Aadhar/PAN):</label>
     <input type="file" id="gov-id" required><br><br>
     <button type="submit">Save Profile</button>
