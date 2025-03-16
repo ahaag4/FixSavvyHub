@@ -169,10 +169,13 @@ async function loadAllStats() {
   const users = await getDocs(collection(db, "users"));
   const providers = await getDocs(query(collection(db, "users"), where("role", "==", "service_provider")));
   const requests = await getDocs(collection(db, "services"));
+  const subscriptions = await getDocs(query(collection(db, "subscriptions"), where("plan", "!=", "Free"))); 
+  
 
   document.getElementById("total-users").textContent = users.size;
   document.getElementById("total-providers").textContent = providers.size;
   document.getElementById("total-requests").textContent = requests.size;
+  document.getElementById("total-subscriptions").textContent = subscriptions.size;
 }
 
 // ✅ Load Pending Subscription Requests
