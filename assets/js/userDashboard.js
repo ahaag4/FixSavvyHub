@@ -177,33 +177,35 @@ document.getElementById("request-service-form").addEventListener("submit", async
 });
 
 
-// ✅ Function to Auto Assign Best Service Provider
+// ✅ Function to Auto Assign Best Service Provider Based on District & Sub-District
 async function autoAssignServiceProvider() {
-  let serviceType = document.getElementById("service").value.toLowerCase(); // Convert input to lowercase
+  let serviceType = document.getElementById("service").value.toLowerCase().trim(); // Normalize input
 
-  // ✅ Get User's City
+  // ✅ Get User's District & Sub-District
   const userRef = await getDoc(doc(db, "users", userId));
   if (!userRef.exists()) return null;
-  const userCity = userRef.data().location;
+  const userDistrict = userRef.data().district;
+  const userSubDistrict = userRef.data().subDistrict;
 
-  // ✅ Fetch All Service Providers in the Same City
+  // ✅ Fetch All Service Providers in the Same District & Sub-District
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
-    where("location", "==", userCity)
+    where("district", "==", userDistrict),
+    where("subDistrict", "==", userSubDistrict)
   );
 
   const providersSnapshot = await getDocs(q);
   if (providersSnapshot.empty) {
-    alert("No service providers available in your city.");
+    alert("No service providers available in your sub-district.");
     return null;
   }
 
   let providers = [];
   providersSnapshot.forEach(docSnap => {
     const provider = docSnap.data();
-    let providerService = provider.service.toLowerCase(); // Convert database value to lowercase
+    let providerService = provider.service.toLowerCase().trim(); // Normalize DB value
 
-    // ✅ Partial Matching Logic (Handles Plumber ≈ Plumbing)
+    // ✅ **Partial Matching** (Plumber ≈ Plumbing)
     if (providerService.includes(serviceType) || serviceType.includes(providerService)) {
       providers.push({
         id: docSnap.id,
@@ -211,25 +213,29 @@ async function autoAssignServiceProvider() {
         completedJobs: provider.completedJobs || 0,
         availability: provider.availability || "Available",
         activeRequests: provider.activeRequests || 0, // Current workload
-        signupDate: provider.signupDate || "9999-12-31" // Oldest provider gets priority if all else is equal
+        signupDate: provider.signupDate || "9999-12-31" // Default to oldest if missing
       });
     }
   });
 
   if (providers.length === 0) {
-    alert("No matching service providers found.");
+    alert("No matching service providers found in your sub-district.");
     return null;
   }
 
-  // ✅ AI-Based Selection: Sorting by Priority
-  let bestProvider = providers.sort((a, b) => {
-    return (b.rating + b.completedJobs) - (a.rating + a.completedJobs) || 
-           a.activeRequests - b.activeRequests || 
-           new Date(a.signupDate) - new Date(b.signupDate);
-  }).find(provider => provider.availability === "Available");
+  // ✅ **Smart Provider Selection** - Sort & Select Best
+  let bestProvider = providers
+    .sort((a, b) => 
+      (b.rating + b.completedJobs) - (a.rating + a.completedJobs) ||  // Prioritize High Ratings & Jobs
+      a.activeRequests - b.activeRequests ||  // Lower workload gets priority
+      new Date(a.signupDate) - new Date(b.signupDate) // Older signups get priority if all else is equal
+    )
+    .find(provider => provider.availability === "Available"); // Only assign "Available" providers
 
   return bestProvider ? bestProvider.id : null;
 }
+
+
 
 
 
