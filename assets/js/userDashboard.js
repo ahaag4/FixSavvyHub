@@ -4,7 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId = null;
+let latestServiceId = null; // Set to null initially
 let subscriptionPlan = "Free";
 let remainingRequests = 1;
 let subscriptionStatus = "Active";
@@ -70,7 +70,6 @@ async function loadUserProfile() {
     }
   }
 }
-
 document.getElementById("profile-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -88,7 +87,6 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   alert("Profile Updated!");
   location.reload();
 });
-
 // ✅ Check Subscription & Update UI
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
@@ -143,7 +141,7 @@ document.getElementById("request-service-form").addEventListener("submit", async
   e.preventDefault();
 
   if (subscriptionStatus === "Pending") {
-    alert("Your subscription upgrade is pending approval. Please wait for admin approval.");
+    alert("Your subscription upgrade is pending approval. Please wait for admin approval before requesting a service.");
     return;
   }
 
@@ -169,6 +167,7 @@ document.getElementById("request-service-form").addEventListener("submit", async
 
   latestServiceId = docRef.id;
 
+  // 🚀 Reduce Remaining Requests
   await updateDoc(doc(db, "subscriptions", userId), {
     remainingRequests: remainingRequests - 1
   });
@@ -177,23 +176,48 @@ document.getElementById("request-service-form").addEventListener("submit", async
   location.reload();
 });
 
-// ✅ Auto Assign Service Provider
+// ✅ Function to Auto Assign Service Provider using AI
 async function autoAssignServiceProvider() {
   const serviceType = document.getElementById("service").value;
 
+  // ✅ Get User's City
   const userRef = await getDoc(doc(db, "users", userId));
   if (!userRef.exists()) return null;
   const userCity = userRef.data().location;
 
+  // ✅ Fetch Available Service Providers in the Same City
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
     where("service", "==", serviceType),
     where("location", "==", userCity)
   );
 
-  const providers = await getDocs(q);
-  return providers.empty ? null : providers.docs[0].id;
+  const providersSnapshot = await getDocs(q);
+  if (providersSnapshot.empty) {
+    alert("No service providers available in your city.");
+    return null;
+  }
+
+  let providers = [];
+  providersSnapshot.forEach(docSnap => {
+    const provider = docSnap.data();
+    providers.push({
+      id: docSnap.id,
+      rating: provider.rating || 0, // Default rating if not available
+      completedJobs: provider.completedJobs || 0, // Number of completed services
+      availability: provider.availability || "Available" // Check if the provider is available
+    });
+  });
+
+  // ✅ AI Selection Logic - Choose the Best Provider
+  let bestProvider = providers.sort((a, b) => {
+    return (b.rating + b.completedJobs) - (a.rating + a.completedJobs); // Prioritize higher rating & experience
+  }).find(provider => provider.availability === "Available");
+
+  return bestProvider ? bestProvider.id : null;
 }
+
+
 
 // ✅ Load User Services
 async function loadUserServices() {
@@ -219,14 +243,22 @@ async function loadUserServices() {
       }
     }
 
+    // ✅ Generate service card with "Give Feedback" button for completed services
     serviceContainer.innerHTML += `
       <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
         <p><b>Service:</b> ${data.serviceName}</p>
         <p><b>Status:</b> ${data.status}</p>
         <p><b>Service Provider:</b> ${providerProfile}</p>
+        <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
+        <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
         <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
+        ${data.status === "Completed" ? `<button onclick="openFeedbackForm('${docSnap.id}')">Give Feedback</button>` : ""}
       </div>
     `;
+
+    if (data.status === "Completed") {
+      document.getElementById("section-4").classList.remove("hidden");
+    }
   });
 }
 
@@ -236,3 +268,32 @@ window.cancelService = async (serviceId) => {
   alert("Service Cancelled!");
   location.reload();
 };
+
+// ✅ Open Feedback Form & Set latestServiceId
+window.openFeedbackForm = (serviceId) => {
+  latestServiceId = serviceId;
+  alert(`Feedback enabled for service: ${latestServiceId}`);
+};
+
+// ✅ Submit Feedback (Fixed)
+document.getElementById("feedback-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!latestServiceId) {
+    alert("Please select a completed service to give feedback.");
+    return;
+  }
+
+  const rating = document.getElementById("rating").value;
+  const feedback = document.getElementById("feedback").value;
+
+  await updateDoc(doc(db, "services", latestServiceId), {
+    feedback,
+    rating,
+    status: "Closed"
+  });
+
+  alert("Feedback Submitted!");
+  location.reload();
+});
+
