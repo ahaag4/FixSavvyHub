@@ -4,7 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId = null; // Set to null initially
+let latestServiceId = null;
 let subscriptionPlan = "Free";
 let remainingRequests = 1;
 let subscriptionStatus = "Active";
@@ -18,10 +18,39 @@ auth.onAuthStateChanged(async (user) => {
   }
 
   userId = user.uid;
+  await checkSubscriptionExpiry();  // ✅ Check and expire subscription if needed
   await loadUserProfile();
   await checkSubscription();
   await loadUserServices();
 });
+
+// ✅ Function to Check & Expire Subscription
+async function checkSubscriptionExpiry() {
+  const subDoc = await getDoc(doc(db, "subscriptions", userId));
+
+  if (subDoc.exists()) {
+    const data = subDoc.data();
+    const subscribedDate = data.subscribedDate; // Subscription start date
+    const currentDate = new Date();
+
+    if (subscribedDate) {
+      const subscriptionEndDate = new Date(subscribedDate);
+      subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1); // Add 1 month
+
+      if (currentDate >= subscriptionEndDate) {
+        // ✅ Subscription expired, downgrade to Free plan
+        await updateDoc(doc(db, "subscriptions", userId), {
+          plan: "Free",
+          remainingRequests: 1,  // Free plan users get 1 request per month
+          status: "Expired"
+        });
+
+        alert("Your Gold subscription has expired. You have been downgraded to the Free plan.");
+        location.reload();
+      }
+    }
+  }
+}
 
 // ✅ Load Profile
 async function loadUserProfile() {
@@ -41,6 +70,7 @@ async function loadUserProfile() {
     }
   }
 }
+
 document.getElementById("profile-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -58,6 +88,7 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   alert("Profile Updated!");
   location.reload();
 });
+
 // ✅ Check Subscription & Update UI
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
@@ -99,7 +130,8 @@ window.requestGoldPlan = async () => {
   await setDoc(doc(db, "subscriptions", userId), {
     plan: "Gold",
     remainingRequests: 35,
-    status: "Pending"
+    status: "Pending",
+    subscribedDate: new Date().toISOString()  // Store start date of Gold subscription
   });
 
   alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
@@ -111,7 +143,7 @@ document.getElementById("request-service-form").addEventListener("submit", async
   e.preventDefault();
 
   if (subscriptionStatus === "Pending") {
-    alert("Your subscription upgrade is pending approval. Please wait for admin approval before requesting a service.");
+    alert("Your subscription upgrade is pending approval. Please wait for admin approval.");
     return;
   }
 
@@ -137,7 +169,6 @@ document.getElementById("request-service-form").addEventListener("submit", async
 
   latestServiceId = docRef.id;
 
-  // 🚀 Reduce Remaining Requests
   await updateDoc(doc(db, "subscriptions", userId), {
     remainingRequests: remainingRequests - 1
   });
@@ -164,7 +195,6 @@ async function autoAssignServiceProvider() {
   return providers.empty ? null : providers.docs[0].id;
 }
 
-
 // ✅ Load User Services
 async function loadUserServices() {
   const q = query(collection(db, "services"), where("requestedBy", "==", userId));
@@ -189,22 +219,14 @@ async function loadUserServices() {
       }
     }
 
-    // ✅ Generate service card with "Give Feedback" button for completed services
     serviceContainer.innerHTML += `
       <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
         <p><b>Service:</b> ${data.serviceName}</p>
         <p><b>Status:</b> ${data.status}</p>
         <p><b>Service Provider:</b> ${providerProfile}</p>
-        <button onclick="window.location.href='profile.html?id=${data.assignedTo}'">View Provider Profile</button>
-        <button onclick="window.location.href='profile.html?id=${userId}'">View Your Profile</button>
         <button onclick="cancelService('${docSnap.id}')">Cancel Service</button>
-        ${data.status === "Completed" ? `<button onclick="openFeedbackForm('${docSnap.id}')">Give Feedback</button>` : ""}
       </div>
     `;
-
-    if (data.status === "Completed") {
-      document.getElementById("section-4").classList.remove("hidden");
-    }
   });
 }
 
@@ -214,32 +236,3 @@ window.cancelService = async (serviceId) => {
   alert("Service Cancelled!");
   location.reload();
 };
-
-// ✅ Open Feedback Form & Set latestServiceId
-window.openFeedbackForm = (serviceId) => {
-  latestServiceId = serviceId;
-  alert(`Feedback enabled for service: ${latestServiceId}`);
-};
-
-// ✅ Submit Feedback (Fixed)
-document.getElementById("feedback-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  if (!latestServiceId) {
-    alert("Please select a completed service to give feedback.");
-    return;
-  }
-
-  const rating = document.getElementById("rating").value;
-  const feedback = document.getElementById("feedback").value;
-
-  await updateDoc(doc(db, "services", latestServiceId), {
-    feedback,
-    rating,
-    status: "Closed"
-  });
-
-  alert("Feedback Submitted!");
-  location.reload();
-});
-
