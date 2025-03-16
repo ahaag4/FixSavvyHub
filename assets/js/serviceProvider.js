@@ -34,7 +34,20 @@ async function loadServiceProviderProfile() {
     document.getElementById("username").value = userData.username;
     document.getElementById("phone").value = userData.phone;
     document.getElementById("address").value = userData.address;
-    document.getElementById("service").value = userData.service;
+      
+       // Populate service dropdown
+    const serviceSelect = document.getElementById("service");
+    const services = ["Plumbing", "Electrician", "Carpentry", "Painting", "AC Repair", "Cleaning"]; // Add more as needed
+    serviceSelect.innerHTML = `<option value="" disabled>Select Service</option>`;
+    services.forEach(service => {
+      const option = document.createElement("option");
+      option.value = service;
+      option.textContent = service;
+      if (userData.service === service) {
+        option.selected = true;
+      }
+      serviceSelect.appendChild(option);
+    });
 
     if (userData.phone && userData.address && userData.service && userData.govID) {
       document.getElementById("section-1").classList.add("hidden");
@@ -159,4 +172,5 @@ async function loadSummary() {
 
 // ✅ Section 6: View Profile
 document.getElementById("view-profile").href = `profile.html`;
-  
+
+                                                         
