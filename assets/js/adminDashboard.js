@@ -11,12 +11,37 @@ auth.onAuthStateChanged(async (user) => {
     return;
   }
 
+    // ✅ Check if user is an admin
+  const userRef = doc(db, "users", user.uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    alert("User data not found. Redirecting...");
+    window.location.href = "signin.html";
+    return;
+  }
+
+  const userData = userSnap.data();
+  if (userData.role !== "admin") {
+    alert("Unauthorized access! Redirecting to dashboard...");
+    window.location.href = "dashboard.html"; // Redirect non-admin users
+    return;
+  }
+
+  // ✅ Load Admin Dashboard Features
   loadAllUsers();
   loadAllProviders();
   loadAllRequests();
   loadAllStats();
-  loadSubscriptionRequests(); // ✅ Ensure this function runs
+  loadSubscriptionRequests(); 
 });
+
+// ✅ Logout
+window.logout = function () {
+  auth.signOut();
+  window.location.href = "signin.html";
+};
+
 
 // ✅ Load All Users
 async function loadAllUsers() {
@@ -204,5 +229,6 @@ window.logout = function () {
   auth.signOut();
   window.location.href = "signin.html";
 };
+
 
       
