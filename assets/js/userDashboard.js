@@ -176,7 +176,8 @@ document.getElementById("request-service-form").addEventListener("submit", async
   location.reload();
 });
 
-// ✅ Function to Auto Assign Service Provider with AI & Fuzzy Matching
+
+// ✅ Function to Auto Assign Best Service Provider
 async function autoAssignServiceProvider() {
   let serviceType = document.getElementById("service").value.toLowerCase(); // Convert input to lowercase
 
@@ -185,7 +186,7 @@ async function autoAssignServiceProvider() {
   if (!userRef.exists()) return null;
   const userCity = userRef.data().location;
 
-  // ✅ Fetch Service Providers in the Same City
+  // ✅ Fetch All Service Providers in the Same City
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
     where("location", "==", userCity)
@@ -202,13 +203,15 @@ async function autoAssignServiceProvider() {
     const provider = docSnap.data();
     let providerService = provider.service.toLowerCase(); // Convert database value to lowercase
 
-    // ✅ Partial Matching Logic (Allows Plumber ≈ Plumbing)
+    // ✅ Partial Matching Logic (Handles Plumber ≈ Plumbing)
     if (providerService.includes(serviceType) || serviceType.includes(providerService)) {
       providers.push({
         id: docSnap.id,
         rating: provider.rating || 0,
         completedJobs: provider.completedJobs || 0,
-        availability: provider.availability || "Available"
+        availability: provider.availability || "Available",
+        activeRequests: provider.activeRequests || 0, // Current workload
+        signupDate: provider.signupDate || "9999-12-31" // Oldest provider gets priority if all else is equal
       });
     }
   });
@@ -218,9 +221,11 @@ async function autoAssignServiceProvider() {
     return null;
   }
 
-  // ✅ AI Selection: Best Provider Based on Rating & Completed Jobs
+  // ✅ AI-Based Selection: Sorting by Priority
   let bestProvider = providers.sort((a, b) => {
-    return (b.rating + b.completedJobs) - (a.rating + a.completedJobs);
+    return (b.rating + b.completedJobs) - (a.rating + a.completedJobs) || 
+           a.activeRequests - b.activeRequests || 
+           new Date(a.signupDate) - new Date(b.signupDate);
   }).find(provider => provider.availability === "Available");
 
   return bestProvider ? bestProvider.id : null;
