@@ -10,13 +10,30 @@
   <form id="signup-form">
     <input type="email" id="email" placeholder="Email" required>
     <input type="password" id="password" placeholder="Password" required>
-    <label for="location">Location</label>
-<input type="text" id="location" placeholder="Enter your city" required />
+
+    <!-- ✅ State Selection -->
+    <label for="state">State</label>
+    <select id="state" required>
+      <option value="" disabled selected>Select State</option>
+    </select>
+
+    <!-- ✅ District Selection (Auto-filled based on State) -->
+    <label for="district">District</label>
+    <select id="district" required>
+      <option value="" disabled selected>Select District</option>
+    </select>
+
+    <!-- ✅ Sub-District Selection (Auto-filled based on District) -->
+    <label for="sub-district">Sub-District</label>
+    <select id="sub-district" required>
+      <option value="" disabled selected>Select Sub-District</option>
+    </select>
+
     <select id="role" required>
       <option value="user">User</option>
       <option value="service_provider">Service Provider</option>
-      <!--<option value="admin">Admin</option>-->
     </select>
+
     <button type="submit">Signup</button>
   </form>
   <script type="module" src="./assets/js/signup.js"></script>
