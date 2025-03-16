@@ -25,7 +25,7 @@ auth.onAuthStateChanged(async (user) => {
   await loadSummary();
 });
 
-// ✅ Section 1: Complete Profile
+// ✅ Section 1: Complete Profile (with Service Selection)
 async function loadServiceProviderProfile() {
   const userDoc = await getDoc(doc(db, "users", userId));
 
@@ -34,8 +34,8 @@ async function loadServiceProviderProfile() {
     document.getElementById("username").value = userData.username;
     document.getElementById("phone").value = userData.phone;
     document.getElementById("address").value = userData.address;
-      
-       // Populate service dropdown
+    
+    // Populate service dropdown
     const serviceSelect = document.getElementById("service");
     const services = ["Plumbing", "Electrician", "Carpentry", "Painting", "AC Repair", "Cleaning"]; // Add more as needed
     serviceSelect.innerHTML = `<option value="" disabled>Select Service</option>`;
@@ -59,6 +59,7 @@ async function loadServiceProviderProfile() {
   }
 }
 
+// ✅ Update Profile with Selected Service
 document.getElementById("profile-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -80,7 +81,7 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   location.reload();
 });
 
-// ✅ Section 2: Load Assigned Services (Auto-Hide on Cancel/Complete)
+// ✅ Load Assigned Services (Auto-Hide on Cancel/Complete)
 async function loadAssignedServices() {
   const q = query(collection(db, "services"), where("assignedTo", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -93,7 +94,6 @@ async function loadAssignedServices() {
     const userRef = await getDoc(doc(db, "users", data.requestedBy));
     const user = userRef.data();
 
-    // ✅ Auto-Hide if Status is Cancelled or Completed
     if (data.status === "Cancelled" || data.status === "Completed") {
       return;
     }
@@ -112,14 +112,14 @@ async function loadAssignedServices() {
   });
 }
 
-// ✅ Section 3: Mark Service Completed (Auto-Hide)
+// ✅ Mark Service Completed
 window.markCompleted = async (serviceId) => {
   await updateDoc(doc(db, "services", serviceId), { status: "Completed" });
   alert("Service marked as completed!");
   location.reload();
 };
 
-// ✅ Section 4: Load Service History
+// ✅ Load Service History
 async function loadServiceHistory() {
   const q = query(collection(db, "services"), where("assignedTo", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -142,7 +142,7 @@ async function loadServiceHistory() {
   });
 }
 
-// ✅ Section 5: Load Summary
+// ✅ Load Summary
 async function loadSummary() {
   const q = query(collection(db, "services"), where("assignedTo", "==", userId));
   const querySnapshot = await getDocs(q);
@@ -170,7 +170,6 @@ async function loadSummary() {
   document.getElementById("average-rating").innerText = avgRating;
 }
 
-// ✅ Section 6: View Profile
+// ✅ View Profile
 document.getElementById("view-profile").href = `profile.html`;
-
-                                                         
+  
