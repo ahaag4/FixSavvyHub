@@ -176,19 +176,18 @@ document.getElementById("request-service-form").addEventListener("submit", async
   location.reload();
 });
 
-// ✅ Function to Auto Assign Service Provider using AI
+// ✅ Function to Auto Assign Service Provider with AI & Fuzzy Matching
 async function autoAssignServiceProvider() {
-  const serviceType = document.getElementById("service").value;
+  let serviceType = document.getElementById("service").value.toLowerCase(); // Convert input to lowercase
 
   // ✅ Get User's City
   const userRef = await getDoc(doc(db, "users", userId));
   if (!userRef.exists()) return null;
   const userCity = userRef.data().location;
 
-  // ✅ Fetch Available Service Providers in the Same City
+  // ✅ Fetch Service Providers in the Same City
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
-    where("service", "==", serviceType),
     where("location", "==", userCity)
   );
 
@@ -201,21 +200,32 @@ async function autoAssignServiceProvider() {
   let providers = [];
   providersSnapshot.forEach(docSnap => {
     const provider = docSnap.data();
-    providers.push({
-      id: docSnap.id,
-      rating: provider.rating || 0, // Default rating if not available
-      completedJobs: provider.completedJobs || 0, // Number of completed services
-      availability: provider.availability || "Available" // Check if the provider is available
-    });
+    let providerService = provider.service.toLowerCase(); // Convert database value to lowercase
+
+    // ✅ Partial Matching Logic (Allows Plumber ≈ Plumbing)
+    if (providerService.includes(serviceType) || serviceType.includes(providerService)) {
+      providers.push({
+        id: docSnap.id,
+        rating: provider.rating || 0,
+        completedJobs: provider.completedJobs || 0,
+        availability: provider.availability || "Available"
+      });
+    }
   });
 
-  // ✅ AI Selection Logic - Choose the Best Provider
+  if (providers.length === 0) {
+    alert("No matching service providers found.");
+    return null;
+  }
+
+  // ✅ AI Selection: Best Provider Based on Rating & Completed Jobs
   let bestProvider = providers.sort((a, b) => {
-    return (b.rating + b.completedJobs) - (a.rating + a.completedJobs); // Prioritize higher rating & experience
+    return (b.rating + b.completedJobs) - (a.rating + a.completedJobs);
   }).find(provider => provider.availability === "Available");
 
   return bestProvider ? bestProvider.id : null;
 }
+
 
 
 
@@ -297,3 +307,4 @@ document.getElementById("feedback-form").addEventListener("submit", async (e) =>
   location.reload();
 });
 
+    
