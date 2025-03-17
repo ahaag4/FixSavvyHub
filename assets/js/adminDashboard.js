@@ -230,27 +230,46 @@ window.rejectSubscription = async function (userId) {
 // ✅ Upload Ad via URL
 async function uploadAd() {
   const adURL = document.getElementById("ad-url").value.trim();
-  if (!adURL) return alert("Please enter a valid image URL");
+  if (!adURL) {
+    alert("Please enter a valid image URL");
+    return;
+  }
 
-  await setDoc(doc(db, "ads", "activeAd"), { image: adURL, status: "active" });
-  alert("Ad uploaded successfully!");
-  loadAdPreview();
+  try {
+    await setDoc(doc(db, "ads", "activeAd"), { image: adURL, status: "active" });
+    alert("Ad uploaded successfully!");
+    loadAdPreview();
+  } catch (error) {
+    console.error("Error uploading ad:", error);
+    alert("Failed to upload ad.");
+  }
 }
 
 // ✅ Remove Ad
 async function removeAd() {
-  await updateDoc(doc(db, "ads", "activeAd"), { status: "removed" });
-  alert("Ad removed!");
-  document.getElementById("ad-preview").innerHTML = "";
+  try {
+    await deleteDoc(doc(db, "ads", "activeAd")); // Properly removes the ad document
+    alert("Ad removed!");
+    document.getElementById("ad-preview").innerHTML = "<p>No active ad</p>";
+  } catch (error) {
+    console.error("Error removing ad:", error);
+    alert("Failed to remove ad.");
+  }
 }
 
-// ✅ Load Ad Preview
+// ✅ Load Ad Preview in Admin Dashboard
 async function loadAdPreview() {
-  const adRef = await getDoc(doc(db, "ads", "activeAd"));
-  if (adRef.exists() && adRef.data().status === "active") {
-    document.getElementById("ad-preview").innerHTML = `<img src="${adRef.data().image}" alt="Ad" style="max-width: 100%;">`;
-  } else {
-    document.getElementById("ad-preview").innerHTML = "<p>No active ad</p>";
+  try {
+    const adRef = await getDoc(doc(db, "ads", "activeAd"));
+    if (adRef.exists() && adRef.data().status === "active") {
+      document.getElementById("ad-preview").innerHTML = `
+        <img src="${adRef.data().image}" alt="Ad" style="max-width: 100%; height: auto;">
+      `;
+    } else {
+      document.getElementById("ad-preview").innerHTML = "<p>No active ad</p>";
+    }
+  } catch (error) {
+    console.error("Error loading ad preview:", error);
   }
 }
 
