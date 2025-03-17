@@ -33,7 +33,8 @@ auth.onAuthStateChanged(async (user) => {
   loadAllProviders();
   loadAllRequests();
   loadAllStats();
-  loadSubscriptionRequests(); 
+  loadSubscriptionRequests();
+  loadAdPreview();
 });
 
 // ✅ Logout
@@ -248,7 +249,7 @@ async function uploadAd() {
 // ✅ Remove Ad
 async function removeAd() {
   try {
-    await deleteDoc(doc(db, "ads", "activeAd")); // Properly removes the ad document
+    await deleteDoc(doc(db, "ads", "activeAd")); // ✅ Removes the ad document
     alert("Ad removed!");
     document.getElementById("ad-preview").innerHTML = "<p>No active ad</p>";
   } catch (error) {
