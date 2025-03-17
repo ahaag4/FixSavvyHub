@@ -165,18 +165,21 @@ window.changeStatus = async function (serviceId) {
 };
 
 
-// ✅ Dashboard Stats
+// ✅ Load Stats (Including Subscription Count)
 async function loadAllStats() {
-  const users = await getDocs(collection(db, "users"));
-  const providers = await getDocs(query(collection(db, "users"), where("role", "==", "service_provider")));
-  const requests = await getDocs(collection(db, "services"));
-  const subscriptions = await getDocs(query(collection(db, "subscriptions"), where("plan", "!=", "Free"))); 
-  
+  try {
+    const users = await getDocs(collection(db, "users"));
+    const providers = await getDocs(query(collection(db, "users"), where("role", "==", "service_provider")));
+    const requests = await getDocs(collection(db, "services"));
+    const subscriptions = await getDocs(query(collection(db, "subscriptions"), where("status", "==", "Approved"))); // ✅ Count only approved subscriptions
 
-  document.getElementById("total-users").textContent = users.size;
-  document.getElementById("total-providers").textContent = providers.size;
-  document.getElementById("total-requests").textContent = requests.size;
-  document.getElementById("total-subscriptions").textContent = subscriptions.size;
+    document.getElementById("total-users").textContent = users.size;
+    document.getElementById("total-providers").textContent = providers.size;
+    document.getElementById("total-requests").textContent = requests.size;
+    document.getElementById("total-subscriptions").textContent = subscriptions.size; // ✅ Correct subscription count
+  } catch (error) {
+    console.error("Error loading stats:", error);
+  }
 }
 
 // ✅ Load Pending Subscription Requests
@@ -228,7 +231,7 @@ window.rejectSubscription = async function (userId) {
   loadSubscriptionRequests();
 };
 
-// ✅ Upload Ad via URL
+// ✅ Upload Ad via URL (Fixed)
 async function uploadAd() {
   const adURL = document.getElementById("ad-url").value.trim();
   if (!adURL) {
@@ -237,19 +240,26 @@ async function uploadAd() {
   }
 
   try {
-    await setDoc(doc(db, "ads", "activeAd"), { image: adURL, status: "active" });
+    await setDoc(doc(db, "ads", "activeAd"), {
+      image: adURL,
+      status: "active",
+      timestamp: new Date()
+    });
+
     alert("Ad uploaded successfully!");
-    loadAdPreview();
+    document.getElementById("ad-url").value = ""; // Clear input after upload
+    loadAdPreview(); // Refresh the ad preview
   } catch (error) {
     console.error("Error uploading ad:", error);
     alert("Failed to upload ad.");
   }
 }
 
-// ✅ Remove Ad
+
+// ✅ Remove Ad (Fixed)
 async function removeAd() {
   try {
-    await deleteDoc(doc(db, "ads", "activeAd")); // ✅ Removes the ad document
+    await deleteDoc(doc(db, "ads", "activeAd"));
     alert("Ad removed!");
     document.getElementById("ad-preview").innerHTML = "<p>No active ad</p>";
   } catch (error) {
@@ -258,24 +268,26 @@ async function removeAd() {
   }
 }
 
-// ✅ Load Ad Preview in Admin Dashboard
+
+// ✅ Load Ad Preview (Fixed)
 async function loadAdPreview() {
   try {
     const adRef = await getDoc(doc(db, "ads", "activeAd"));
+
     if (adRef.exists() && adRef.data().status === "active") {
+      const adData = adRef.data();
       document.getElementById("ad-preview").innerHTML = `
-        <img src="${adRef.data().image}" alt="Ad" style="max-width: 100%; height: auto;">
+        <img src="${adData.image}" alt="Ad" style="max-width: 100%; height: auto; display: block; margin-top: 10px;">
       `;
     } else {
       document.getElementById("ad-preview").innerHTML = "<p>No active ad</p>";
     }
   } catch (error) {
     console.error("Error loading ad preview:", error);
+    document.getElementById("ad-preview").innerHTML = "<p>Failed to load ad</p>";
   }
 }
 
-// ✅ Load Ad Preview on Page Load
-window.onload = loadAdPreview;
 
 
 // ✅ Logout
