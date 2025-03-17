@@ -227,6 +227,37 @@ window.rejectSubscription = async function (userId) {
   loadSubscriptionRequests();
 };
 
+// ✅ Upload Ad via URL
+async function uploadAd() {
+  const adURL = document.getElementById("ad-url").value.trim();
+  if (!adURL) return alert("Please enter a valid image URL");
+
+  await setDoc(doc(db, "ads", "activeAd"), { image: adURL, status: "active" });
+  alert("Ad uploaded successfully!");
+  loadAdPreview();
+}
+
+// ✅ Remove Ad
+async function removeAd() {
+  await updateDoc(doc(db, "ads", "activeAd"), { status: "removed" });
+  alert("Ad removed!");
+  document.getElementById("ad-preview").innerHTML = "";
+}
+
+// ✅ Load Ad Preview
+async function loadAdPreview() {
+  const adRef = await getDoc(doc(db, "ads", "activeAd"));
+  if (adRef.exists() && adRef.data().status === "active") {
+    document.getElementById("ad-preview").innerHTML = `<img src="${adRef.data().image}" alt="Ad" style="max-width: 100%;">`;
+  } else {
+    document.getElementById("ad-preview").innerHTML = "<p>No active ad</p>";
+  }
+}
+
+// ✅ Load Ad Preview on Page Load
+window.onload = loadAdPreview;
+
+
 // ✅ Logout
 window.logout = function () {
   auth.signOut();
