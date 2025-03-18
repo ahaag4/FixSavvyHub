@@ -231,7 +231,7 @@ window.rejectSubscription = async function (userId) {
   loadSubscriptionRequests();
 };
 
-// ✅ Upload Ad via URL (Fixed)
+// ✅ Upload Ad via URL
 window.uploadAd = async function () {
   const adURL = document.getElementById("ad-url").value.trim();
   if (!adURL) {
@@ -255,7 +255,7 @@ window.uploadAd = async function () {
   }
 };
 
-// ✅ Remove Ad (Fixed)
+// ✅ Remove Ad
 window.removeAd = async function () {
   try {
     await deleteDoc(doc(db, "ads", "activeAd"));
@@ -267,7 +267,7 @@ window.removeAd = async function () {
   }
 };
 
-// ✅ Load Ad Preview (Fixed)
+// ✅ Load Ad Preview
 async function loadAdPreview() {
   try {
     const adRef = await getDoc(doc(db, "ads", "activeAd"));
@@ -280,6 +280,14 @@ async function loadAdPreview() {
     } else {
       document.getElementById("ad-preview").innerHTML = "<p>No active ad</p>";
     }
+  } catch (error) {
+    console.error("Error loading ad preview:", error);
+    document.getElementById("ad-preview").innerHTML = "<p>Failed to load ad</p>";
+  }
+}
+
+// ✅ Load Ad on Page Load
+window.onload = loadAdPreview;
 
 
 
