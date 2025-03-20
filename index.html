@@ -1,176 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FixEasy - Home</title>
-  <link rel="stylesheet" href="assets/css/style.css">
-  <style>
-    /* General Styles */
-    body {
-      margin: 0;
-      font-family: 'Arial', sans-serif;
-      background-color: #f4f4f4;
-      color: #333;
-    }
-    header {
-      background: linear-gradient(45deg, #007bff, #0056b3);
-      color: white;
-      padding: 15px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    header h1 {
-      font-size: 24px;
-      margin: 0;
-    }
-    header .menu-icon {
-      cursor: pointer;
-      font-size: 20px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FixEasy - Home Services</title>
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        // Auto Dark Mode Detection
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark-mode');
+        }
+    </script>
+    <style>
+        /* General Styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f9f9f9;
+            color: #333;
+        }
+        .dark-mode {
+            background: #222;
+            color: #fff;
+        }
 
-    /* Sidebar */
-    .sidebar {
-      position: fixed;
-      top: 0;
-      left: -250px;
-      width: 250px;
-      height: 100%;
-      background-color: #222;
-      color: white;
-      padding-top: 60px;
-      transition: left 0.3s ease;
-      z-index: 1000;
-    }
-    .sidebar.active {
-      left: 0;
-    }
-    .sidebar a {
-      display: block;
-      color: white;
-      padding: 10px 20px;
-      text-decoration: none;
-      border-bottom: 1px solid #444;
-    }
-    .sidebar a:hover {
-      background-color: #444;
-    }
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            background: url('hero-bg.jpg') no-repeat center center/cover;
+            padding: 80px 20px;
+            color: #fff;
+        }
+        .hero h1 {
+            font-size: 2.5em;
+        }
+        .hero p {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            background: #ff5722;
+            color: white;
+            text-decoration: none;
+            font-size: 1.2em;
+            border-radius: 5px;
+        }
 
-    /* Main Content */
-    .container {
-      max-width: 900px;
-      margin: 20px auto;
-      padding: 20px;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      text-align: center;
-    }
-    h1 {
-      font-size: 32px;
-      margin-bottom: 20px;
-    }
-    p {
-      font-size: 18px;
-      margin-bottom: 20px;
-    }
-    .btn-group {
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-    }
-    .btn {
-      text-decoration: none;
-      font-size: 16px;
-      padding: 10px 20px;
-      color: white;
-      background: #007bff;
-      border: none;
-      border-radius: 5px;
-      transition: background 0.3s ease;
-    }
-    .btn:hover {
-      background: #0056b3;
-    }
+        /* Services Section */
+        .services {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            padding: 30px;
+        }
+        .service-box {
+            text-align: center;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            width: 120px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .service-box img {
+            width: 50px;
+            margin-bottom: 10px;
+        }
 
-    /* Ad Styles */
-    .ad-banner {
-      text-align: center;
-      margin: 20px 0;
-    }
-    .ad-banner img {
-      max-width: 100%;
-      height: auto;
-    }
+        /* Testimonials */
+        .testimonials {
+            text-align: center;
+            padding: 30px;
+            background: #fff3e0;
+        }
 
-    /* Footer */
-    footer {
-      text-align: center;
-      padding: 15px 0;
-      background-color: #f4f4f4;
-      color: #777;
-      font-size: 14px;
-      border-top: 1px solid #ddd;
-    }
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #222;
+            color: white;
+        }
 
-    /* Responsive */
-    @media (max-width: 768px) {
-      header h1 {
-        font-size: 20px;
-      }
-      .btn {
-        font-size: 14px;
-        padding: 8px 15px;
-      }
-    }
-  </style>
+        /* WhatsApp Chat */
+        .whatsapp {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #25D366;
+            padding: 10px 15px;
+            border-radius: 50px;
+            color: white;
+            font-size: 16px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-  <!-- Header -->
-  <header>
-    <h1>FixEasy</h1>
-    <span class="menu-icon" onclick="toggleSidebar()">☰</span>
-  </header>
 
-  <!-- Sidebar -->
-  <div class="sidebar" id="sidebar">
-    <a href="index.html">Home</a>
-    <a href="about.html">About Us</a>
-    <a href="contact.html">Contact Us</a>
-      <!-- <a href="terms.html">Terms & Conditions</a> -->
-    <a href="signin.html">Sign In</a>
-  </div>
-
-  <!-- Main Content -->
-  <div class="container">
-    <h1>Welcome to FixEasy</h1>
-    <p>Connecting you to the best service providers for all your needs. Join us today!</p>
-
-    <!-- Ad Placement 1 (Inline Content) -->
-     <!--  <div class="ad-banner">
-      <img src="your-ad-placeholder.jpg" alt="Ad">
-    </div> -->
-
-    <div class="btn-group">
-      <a href="signup.html" class="btn">Get Started</a>
+    <!-- Hero Section -->
+    <div class="hero">
+        <h1>Find Trusted Experts for Your Needs</h1>
+        <p>Book top-rated service providers in just a few clicks!</p>
+        <a href="signup.html" class="btn">Find Services</a>
     </div>
-  </div>
 
-  <!-- Ad Placement 2 (Footer Ad) -->
-  <footer>
-      <!-- <div class="ad-banner">
-      <img src="your-ad-placeholder.jpg" alt="Ad">
-    </div> -->
-    © 2025 FixEasy | All Rights Reserved
-  </footer>
+    <!-- Services Section -->
+    <div id="services" class="services">
+        <div class="service-box">
+            <img src="https://i.postimg.cc/Yq41P6HX/ele4.webp" alt="Electrician">
+            <p>Electrician</p>
+        </div>
+        <div class="service-box">
+            <img src="https://i.postimg.cc/8kYvL76L/plum2.webp" alt="Plumber">
+            <p>Plumber</p>
+        </div>
+        <div class="service-box">
+            <img src="https://i.postimg.cc/LsSLhGZ7/car3.webp" alt="Carpenter">
+            <p>Carpenter</p>
+        </div>
+        <div class="service-box">
+            <img src="https://i.postimg.cc/9Q5qNs1M/ac1.webp" alt="AC Repair">
+            <p>AC Repair</p>
+        </div>
+    </div>
 
-  <script>
-    // Sidebar Toggle Function
-    function toggleSidebar() {
-      const sidebar = document.getElementById('sidebar');
-      sidebar.classList.toggle('active');
-    }
-  </script>
+    <!-- Testimonials -->
+    <div class="testimonials">
+        <h2>What Our Customers Say</h2>
+        <p>⭐⭐⭐⭐⭐ "Great service, very professional!" - Rajesh</p>
+        <p>⭐⭐⭐⭐⭐ "Quick and reliable, highly recommend!" - Priya</p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>&copy; 2025 FixEasy. All Rights Reserved.</p>
+    </div>
+
+    <!-- WhatsApp Chat Button -->
+    <a href="contact.html" class="whatsapp">💬 contact with Us</a>
+
 </body>
 </html>
