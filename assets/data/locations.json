@@ -1,17 +1,6 @@
 {
   "Maharashtra": {
     "Mumbai": ["Andheri", "Bandra", "Dadar", "Borivali"],
-    "Pune": ["Shivajinagar", "Hinjewadi", "Kothrud"]
-  },
-  "Uttar Pradesh": {
-    "Lucknow": ["Gomti Nagar", "Aliganj", "Hazratganj"],
-    "Kanpur": ["Panki", "Govind Nagar", "Tilak Nagar"]
-  },
-  "Delhi": {
-    "Central Delhi": ["Connaught Place", "Karol Bagh"],
-    "South Delhi": ["Hauz Khas", "Saket", "Vasant Kunj"]
-  },
-  "Karnataka": {
-    "Bangalore": ["Whitefield", "Electronic City", "Jayanagar"]
+   "Pune": ["Shivajinagar", "Hinjewadi", "Kothrud"]
   }
 }
