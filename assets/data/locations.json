@@ -1,6 +1,5 @@
 {
   "Maharashtra": {
-    "Mumbai": ["Andheri", "Bandra", "Dadar", "Borivali"],
-   "Pune": ["Shivajinagar", "Hinjewadi", "Kothrud"]
+    "Mumbai": ["Churchgate","Marine Lines","Charni Road","Grant Road","Mumbai central","Andheri", "Bandra", "Dadar", "Borivali","Dahisar","Mira road","Bhayandar","Naigaon","Vasai road","Nalla sopara","Virar"]
   }
 }
