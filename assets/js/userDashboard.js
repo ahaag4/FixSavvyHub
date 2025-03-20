@@ -235,24 +235,7 @@ async function autoAssignServiceProvider() {
   return bestProvider ? bestProvider.id : null;
 }
 
-//ads
-async function loadAds() {
-  const userSub = await getDoc(doc(db, "subscriptions", userId));
 
-  if (userSub.exists() && userSub.data().plan !== "Free") return; // No ads for paid users
-
-  const adRef = await getDoc(doc(db, "ads", "activeAd"));
-  if (adRef.exists() && adRef.data().status === "active") {
-    document.getElementById("ads-content").innerHTML = `
-      <img src="${adRef.data().image}" alt="Ad" style="max-width: 100%;">
-    `;
-  } else {
-    document.getElementById("ads-content").innerHTML = "";
-  }
-}
-
-// ✅ Load Ads on Page Load
-window.onload = loadAds;
 
 
 
