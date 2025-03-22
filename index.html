@@ -6,7 +6,6 @@
     <meta name="description" content="Find trusted AC repair, plumbing, carpentry, and electrician services near you. Book expert service providers at FixSavvyHub.">
     <title>AC Repair, Plumbing, Carpentry Services - FixSavvyHub</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="icon" type="image/png" href="https://fixsavvyhub.pages.dev/assets/image/favicon.ico">
     <script>
         // Auto Dark Mode Detection
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -99,6 +98,31 @@
             text-decoration: none;
             font-weight: bold;
         }
+        /*FAQ*/
+                .accordion {
+            background-color: #f9f9f9;
+            color: #333;
+            cursor: pointer;
+            padding: 15px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 18px;
+            transition: 0.4s;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .active, .accordion:hover {
+            background-color: #ddd;
+        }
+
+        .panel {
+            padding: 0 15px;
+            display: none;
+            background-color: white;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
@@ -129,6 +153,33 @@
             <p>AC Repair</p>
         </div>
     </div>
+    <!--faq-->
+        <h2>Frequently Asked Questions</h2>
+
+    <button class="accordion">What is Fixeasy?</button>
+    <div class="panel">
+        <p>Fixeasy is a platform that provides quick and easy solutions to common problems.</p>
+    </div>
+
+    <button class="accordion">How do I register?</button>
+    <div class="panel">
+        <p>You can register by clicking on the "Sign Up" button and filling in your details.</p>
+    </div>
+        <script>
+        var acc = document.getElementsByClassName("accordion");
+        for (var i = 0; i < acc.length; i++) {
+            acc[i].addEventListener("click", function() {
+                this.classList.toggle("active");
+                var panel = this.nextElementSibling;
+                if (panel.style.display === "block") {
+                    panel.style.display = "none";
+                } else {
+                    panel.style.display = "block";
+                }
+            });
+        }
+    </script>
+
 
     <!-- Testimonials -->
     <div class="testimonials">
