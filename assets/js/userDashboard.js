@@ -177,9 +177,9 @@ document.getElementById("request-service-form").addEventListener("submit", async
 });
 
 
-// ✅ Function to Auto Assign Best Service Provider Based on District & Sub-District
+// ✅ Function to Auto Assign Best Service Provider
 async function autoAssignServiceProvider() {
-  let serviceType = document.getElementById("service").value.toLowerCase().trim(); // Normalize input
+  let serviceType = document.getElementById("service").value.toLowerCase().trim();
 
   // ✅ Get User's District & Sub-District
   const userRef = await getDoc(doc(db, "users", userId));
@@ -187,7 +187,7 @@ async function autoAssignServiceProvider() {
   const userDistrict = userRef.data().district;
   const userSubDistrict = userRef.data().subDistrict;
 
-  // ✅ Fetch All Service Providers in the Same District & Sub-District
+  // ✅ Check Database for Providers
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
     where("district", "==", userDistrict),
@@ -195,46 +195,58 @@ async function autoAssignServiceProvider() {
   );
 
   const providersSnapshot = await getDocs(q);
-  if (providersSnapshot.empty) {
-    alert("No service providers available in your sub-district.");
-    return null;
-  }
+  if (!providersSnapshot.empty) {
+    let providers = [];
+    providersSnapshot.forEach(docSnap => {
+      const provider = docSnap.data();
+      let providerService = provider.service.toLowerCase().trim();
 
-  let providers = [];
-  providersSnapshot.forEach(docSnap => {
-    const provider = docSnap.data();
-    let providerService = provider.service.toLowerCase().trim(); // Normalize DB value
+      // ✅ **Partial Matching** (Plumber ≈ Plumbing)
+      if (providerService.includes(serviceType) || serviceType.includes(providerService)) {
+        providers.push({
+          id: docSnap.id,
+          rating: provider.rating || 0,
+          completedJobs: provider.completedJobs || 0,
+          availability: provider.availability || "Available",
+          activeRequests: provider.activeRequests || 0,
+          signupDate: provider.signupDate || "9999-12-31"
+        });
+      }
+    });
 
-    // ✅ **Partial Matching** (Plumber ≈ Plumbing)
-    if (providerService.includes(serviceType) || serviceType.includes(providerService)) {
-      providers.push({
-        id: docSnap.id,
-        rating: provider.rating || 0,
-        completedJobs: provider.completedJobs || 0,
-        availability: provider.availability || "Available",
-        activeRequests: provider.activeRequests || 0, // Current workload
-        signupDate: provider.signupDate || "9999-12-31" // Default to oldest if missing
-      });
+    if (providers.length > 0) {
+      let bestProvider = providers
+        .sort((a, b) => 
+          (b.rating + b.completedJobs) - (a.rating + a.completedJobs) ||
+          a.activeRequests - b.activeRequests ||
+          new Date(a.signupDate) - new Date(b.signupDate)
+        )
+        .find(provider => provider.availability === "Available");
+
+      return bestProvider ? bestProvider.id : null;
     }
-  });
-
-  if (providers.length === 0) {
-    alert("No matching service providers found in your sub-district.");
-    return null;
   }
 
-  // ✅ **Smart Provider Selection** - Sort & Select Best
-  let bestProvider = providers
-    .sort((a, b) => 
-      (b.rating + b.completedJobs) - (a.rating + a.completedJobs) ||  // Prioritize High Ratings & Jobs
-      a.activeRequests - b.activeRequests ||  // Lower workload gets priority
-      new Date(a.signupDate) - new Date(b.signupDate) // Older signups get priority if all else is equal
-    )
-    .find(provider => provider.availability === "Available"); // Only assign "Available" providers
-
-  return bestProvider ? bestProvider.id : null;
+  // ✅ **If No Provider Found in Database, Search via OpenStreetMap API**
+  return await findServiceProviderOSM(serviceType, userDistrict);
 }
 
+// ✅ **Find Service Provider using OpenStreetMap API (100% Free)**
+async function findServiceProviderOSM(serviceType, userDistrict) {
+  let url = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${userDistrict}`;
+  try {
+    let response = await fetch(url);
+    let data = await response.json();
+    if (data.length === 0) {
+      alert("No service providers found in your area.");
+      return null;
+    }
+    return data[0].display_name; // Returns the first matching result
+  } catch (error) {
+    console.error("OSM API Error:", error);
+    return null;
+  }
+}
 
 
 
