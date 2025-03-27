@@ -228,20 +228,48 @@ async function autoAssignServiceProvider() {
   }
 
   // ✅ **If No Provider Found in Database, Search via OpenStreetMap API**
-  return await findServiceProviderOSM(serviceType, userDistrict);
+  let newProvider = await findServiceProviderOSM(serviceType, userDistrict, userSubDistrict);
+  if (newProvider) {
+    return newProvider.id; // Return newly added provider's ID
+  }
+  return null;
 }
 
-// ✅ **Find Service Provider using OpenStreetMap API (100% Free)**
-async function findServiceProviderOSM(serviceType, userDistrict) {
+// ✅ **Find Service Provider using OpenStreetMap API & Add to Firestore**
+async function findServiceProviderOSM(serviceType, userDistrict, userSubDistrict) {
   let url = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${userDistrict}`;
   try {
     let response = await fetch(url);
     let data = await response.json();
+    
     if (data.length === 0) {
       alert("No service providers found in your area.");
       return null;
     }
-    return data[0].display_name; // Returns the first matching result
+
+    // ✅ **Extract & Store Provider Info**
+    let provider = {
+      name: data[0].display_name.split(",")[0], // First part of the name
+      address: data[0].display_name,
+      phone: "Not Available", // OSM doesn't provide phone numbers
+      role: "service_provider",
+      service: serviceType,
+      district: userDistrict,
+      subDistrict: userSubDistrict,
+      rating: 0,
+      completedJobs: 0,
+      availability: "Available",
+      activeRequests: 0,
+      signupDate: new Date().toISOString()
+    };
+
+    // ✅ **Add New Provider to Firestore**
+    const docRef = await addDoc(collection(db, "users"), provider);
+    provider.id = docRef.id; // Assign Firestore-generated ID
+
+    alert(`New service provider added: ${provider.name}`);
+    return provider; // Return the added provider's details
+
   } catch (error) {
     console.error("OSM API Error:", error);
     return null;
