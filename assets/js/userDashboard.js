@@ -187,11 +187,11 @@ async function autoAssignServiceProvider() {
   const userDistrict = userRef.data().district;
   const userSubDistrict = userRef.data().subDistrict;
 
-  // ✅ Check Firestore for Providers
+  // ✅ Check Firestore for Providers (Match District & Sub-District)
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
     where("district", "==", userDistrict),
-    where("subDistrict", "==", userSubDistrict)
+    where("subDistrict", "==", userSubDistrict) // Ensure same sub-district
   );
 
   const providersSnapshot = await getDocs(q);
@@ -237,22 +237,30 @@ async function autoAssignServiceProvider() {
 
 // ✅ **Find Service Provider using OpenStreetMap + Yelp API**
 async function findServiceProviderEnhanced(serviceType, userDistrict, userSubDistrict) {
-  let osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${userDistrict}&extratags=1`;
+  let osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${userSubDistrict}, ${userDistrict}&extratags=1`;
+  
   try {
     let response = await fetch(osmUrl);
     let data = await response.json();
 
-    if (data.length === 0) {
+    // ✅ Ensure provider is within the correct sub-district
+    let validProviders = data.filter(provider =>
+      provider.display_name.toLowerCase().includes(userSubDistrict.toLowerCase())
+    );
+
+    if (validProviders.length === 0) {
       console.log("No providers found via OSM. Trying Yelp...");
-      return await findServiceProviderYelp(serviceType, userDistrict); // Try Yelp API
+      return await findServiceProviderYelp(serviceType, userDistrict, userSubDistrict);
     }
+
+    let providerData = validProviders[0];
 
     // ✅ Extract & Store Provider Info (if OSM finds a match)
     let provider = {
-      name: data[0].display_name.split(",")[0], 
-      address: data[0].display_name,
-      phone: data[0].extratags?.phone || "Not Available", // Extract phone if available
-      website: data[0].extratags?.website || "Not Available",
+      name: providerData.display_name.split(",")[0], 
+      address: providerData.display_name,
+      phone: providerData.extratags?.phone || "Not Available",
+      website: providerData.extratags?.website || "Not Available",
       role: "service_provider",
       service: serviceType,
       district: userDistrict,
@@ -264,7 +272,7 @@ async function findServiceProviderEnhanced(serviceType, userDistrict, userSubDis
       signupDate: new Date().toISOString()
     };
 
-    // ✅ Add New Provider to Firestore
+    // ✅ Add to Firestore
     const docRef = await addDoc(collection(db, "users"), provider);
     provider.id = docRef.id;
 
@@ -278,8 +286,8 @@ async function findServiceProviderEnhanced(serviceType, userDistrict, userSubDis
 }
 
 // ✅ **Find Service Provider using Yelp API (More Accurate)**
-async function findServiceProviderYelp(serviceType, userDistrict) {
-  let yelpUrl = `https://api.yelp.com/v3/businesses/search?term=${serviceType}&location=${userDistrict}&limit=1`;
+async function findServiceProviderYelp(serviceType, userDistrict, userSubDistrict) {
+  let yelpUrl = `https://api.yelp.com/v3/businesses/search?term=${serviceType}&location=${userSubDistrict},${userDistrict}&limit=1`;
   
   try {
     let response = await fetch(yelpUrl, {
@@ -289,12 +297,16 @@ async function findServiceProviderYelp(serviceType, userDistrict) {
     });
 
     let data = await response.json();
-    if (data.businesses.length === 0) {
+    let validBusinesses = data.businesses.filter(business =>
+      business.location.address1.toLowerCase().includes(userSubDistrict.toLowerCase())
+    );
+
+    if (validBusinesses.length === 0) {
       alert("No service providers found via Yelp either.");
       return null;
     }
 
-    let business = data.businesses[0];
+    let business = validBusinesses[0];
 
     let provider = {
       name: business.name,
@@ -304,7 +316,7 @@ async function findServiceProviderYelp(serviceType, userDistrict) {
       role: "service_provider",
       service: serviceType,
       district: userDistrict,
-      subDistrict: "Unknown",
+      subDistrict: userSubDistrict,
       rating: business.rating || 0,
       completedJobs: 0,
       availability: "Available",
