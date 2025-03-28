@@ -177,31 +177,36 @@ document.getElementById("request-service-form").addEventListener("submit", async
 });
 
 
-// ✅ Function to Auto Assign Best Service Provider
+// ✅ Function to Auto Assign Best Service Provider (With Debugging)
 async function autoAssignServiceProvider() {
   let serviceType = document.getElementById("service").value.toLowerCase().trim();
+  console.log("🔍 Searching for:", serviceType);
 
   // ✅ Get User's District & Sub-District
   const userRef = await getDoc(doc(db, "users", userId));
-  if (!userRef.exists()) return null;
+  if (!userRef.exists()) return console.log("❌ User not found in Firestore");
+
   const userDistrict = userRef.data().district;
   const userSubDistrict = userRef.data().subDistrict;
+  console.log(`📍 User Location: ${userSubDistrict}, ${userDistrict}`);
 
-  // ✅ Check Firestore for Providers (Match District & Sub-District)
+  // ✅ Search Firestore for Service Providers
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
     where("district", "==", userDistrict),
-    where("subDistrict", "==", userSubDistrict) // Ensure same sub-district
+    where("subDistrict", "==", userSubDistrict) // Ensures same sub-district
   );
 
   const providersSnapshot = await getDocs(q);
+  console.log(`📊 Firestore Providers Found: ${providersSnapshot.size}`);
+
   if (!providersSnapshot.empty) {
     let providers = [];
     providersSnapshot.forEach(docSnap => {
       const provider = docSnap.data();
-      let providerService = provider.service.toLowerCase().trim();
+      console.log("🛠 Checking Firestore Provider:", provider);
 
-      // ✅ **Better Matching** (Plumber ≈ Plumbing)
+      let providerService = provider.service.toLowerCase().trim();
       if (providerService.includes(serviceType) || serviceType.includes(providerService)) {
         providers.push({
           id: docSnap.id,
@@ -223,39 +228,45 @@ async function autoAssignServiceProvider() {
         )
         .find(provider => provider.availability === "Available");
 
+      console.log("✅ Assigned Firestore Provider:", bestProvider);
       return bestProvider ? bestProvider.id : null;
     }
   }
 
-  // ✅ **If No Provider Found, Search External APIs**
+  // ✅ No Firestore Provider Found → Search External APIs
+  console.log("🔍 No Firestore match. Searching via OSM & Yelp...");
   let newProvider = await findServiceProviderEnhanced(serviceType, userDistrict, userSubDistrict);
+  
   if (newProvider) {
-    return newProvider.id; // Return newly added provider's ID
+    console.log("✅ Assigned External Provider:", newProvider);
+    return newProvider.id;
   }
+
+  console.log("❌ No providers found.");
   return null;
 }
 
-// ✅ **Find Service Provider using OpenStreetMap + Yelp API**
+// ✅ **Find Provider via OpenStreetMap & Yelp**
 async function findServiceProviderEnhanced(serviceType, userDistrict, userSubDistrict) {
   let osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${userSubDistrict}, ${userDistrict}&extratags=1`;
-  
+  console.log("🌍 OSM Query URL:", osmUrl);
+
   try {
     let response = await fetch(osmUrl);
     let data = await response.json();
+    console.log("📡 OSM Response:", data);
 
-    // ✅ Ensure provider is within the correct sub-district
     let validProviders = data.filter(provider =>
       provider.display_name.toLowerCase().includes(userSubDistrict.toLowerCase())
     );
 
     if (validProviders.length === 0) {
-      console.log("No providers found via OSM. Trying Yelp...");
+      console.log("❌ No OSM match. Trying Yelp...");
       return await findServiceProviderYelp(serviceType, userDistrict, userSubDistrict);
     }
 
     let providerData = validProviders[0];
 
-    // ✅ Extract & Store Provider Info (if OSM finds a match)
     let provider = {
       name: providerData.display_name.split(",")[0], 
       address: providerData.display_name,
@@ -276,63 +287,11 @@ async function findServiceProviderEnhanced(serviceType, userDistrict, userSubDis
     const docRef = await addDoc(collection(db, "users"), provider);
     provider.id = docRef.id;
 
-    alert(`New service provider added: ${provider.name}`);
+    console.log("✅ New Provider Added:", provider);
     return provider;
 
   } catch (error) {
-    console.error("OSM API Error:", error);
-    return null;
-  }
-}
-
-// ✅ **Find Service Provider using Yelp API (More Accurate)**
-async function findServiceProviderYelp(serviceType, userDistrict, userSubDistrict) {
-  let yelpUrl = `https://api.yelp.com/v3/businesses/search?term=${serviceType}&location=${userSubDistrict},${userDistrict}&limit=1`;
-  
-  try {
-    let response = await fetch(yelpUrl, {
-      headers: {
-        "Authorization": `Bearer YOUR_YELP_API_KEY` // Get API key from Yelp
-      }
-    });
-
-    let data = await response.json();
-    let validBusinesses = data.businesses.filter(business =>
-      business.location.address1.toLowerCase().includes(userSubDistrict.toLowerCase())
-    );
-
-    if (validBusinesses.length === 0) {
-      alert("No service providers found via Yelp either.");
-      return null;
-    }
-
-    let business = validBusinesses[0];
-
-    let provider = {
-      name: business.name,
-      address: business.location.address1,
-      phone: business.phone || "Not Available",
-      website: business.url || "Not Available",
-      role: "service_provider",
-      service: serviceType,
-      district: userDistrict,
-      subDistrict: userSubDistrict,
-      rating: business.rating || 0,
-      completedJobs: 0,
-      availability: "Available",
-      activeRequests: 0,
-      signupDate: new Date().toISOString()
-    };
-
-    // ✅ Add to Firestore
-    const docRef = await addDoc(collection(db, "users"), provider);
-    provider.id = docRef.id;
-
-    alert(`New service provider added from Yelp: ${provider.name}`);
-    return provider;
-
-  } catch (error) {
-    console.error("Yelp API Error:", error);
+    console.error("❌ OSM API Error:", error);
     return null;
   }
 }
