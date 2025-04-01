@@ -185,16 +185,48 @@ async function autoAssignServiceProvider() {
   const userRef = await getDoc(doc(db, "users", userId));
   if (!userRef.exists()) return null;
   const userSubDistrict = userRef.data().subDistrict;
+  const userDistrict = userRef.data().district; // Assuming district is also available
 
-  // ✅ Check Firestore for Providers
+  // ✅ Check Firestore for Providers in Sub-District
+  let providers = await findProviders(serviceType, userSubDistrict);
+
+  // ✅ If no providers found, search in the District
+  if (providers.length === 0) {
+    console.log("No providers found in sub-district. Searching in district...");
+    providers = await findProviders(serviceType, userDistrict);
+  }
+
+  // ✅ If Providers are found, sort and return the best one
+  if (providers.length > 0) {
+    let bestProvider = providers
+      .sort((a, b) => 
+        (b.rating + b.completedJobs) - (a.rating + a.completedJobs) ||
+        a.activeRequests - b.activeRequests ||
+        new Date(a.signupDate) - new Date(b.signupDate)
+      )
+      .find(provider => provider.availability === "Available");
+
+    return bestProvider ? bestProvider.id : null;
+  }
+
+  // ✅ **If No Provider Found, Search External APIs**
+  let newProvider = await findServiceProviderEnhanced(serviceType, userSubDistrict);
+  if (newProvider) {
+    return newProvider.id; // Return newly added provider's ID
+  }
+  return null;
+}
+
+// ✅ **Find Providers by Sub-District or District**
+async function findProviders(serviceType, location) {
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
-    where("subDistrict", "==", userSubDistrict)
+    where("subDistrict", "==", location) // This will work for both sub-district and district search
   );
 
   const providersSnapshot = await getDocs(q);
+  let providers = [];
   if (!providersSnapshot.empty) {
-    let providers = [];
     providersSnapshot.forEach(docSnap => {
       const provider = docSnap.data();
       let providerService = provider.service.toLowerCase().trim();
@@ -211,26 +243,9 @@ async function autoAssignServiceProvider() {
         });
       }
     });
-
-    if (providers.length > 0) {
-      let bestProvider = providers
-        .sort((a, b) => 
-          (b.rating + b.completedJobs) - (a.rating + a.completedJobs) ||
-          a.activeRequests - b.activeRequests ||
-          new Date(a.signupDate) - new Date(b.signupDate)
-        )
-        .find(provider => provider.availability === "Available");
-
-      return bestProvider ? bestProvider.id : null;
-    }
   }
 
-  // ✅ **If No Provider Found, Search External APIs**
-  let newProvider = await findServiceProviderEnhanced(serviceType, userSubDistrict);
-  if (newProvider) {
-    return newProvider.id; // Return newly added provider's ID
-  }
-  return null;
+  return providers;
 }
 
 // ✅ **Find Service Provider using OpenStreetMap + Yelp API**
