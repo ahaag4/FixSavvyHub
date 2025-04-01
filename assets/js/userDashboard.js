@@ -177,105 +177,145 @@ document.getElementById("request-service-form").addEventListener("submit", async
 });
 
 
-// ✅ Function to Auto Assign Best Service Provider
+// ✅ Auto Assign & Store New Providers if Found
 async function autoAssignServiceProvider() {
-  let serviceType = document.getElementById("service").value.toLowerCase().trim();
+  try {
+    let serviceType = document.getElementById("service").value.toLowerCase().trim(); // Normalize input
 
-  // ✅ Get User's District & Sub-District
-  const userRef = await getDoc(doc(db, "users", userId));
-  if (!userRef.exists()) return null;
-  const userDistrict = userRef.data().district;
-  const userSubDistrict = userRef.data().subDistrict;
+    // ✅ Get User's District & Sub-District
+    const userRef = await getDoc(doc(db, "users", userId));
+    if (!userRef.exists()) {
+      console.warn("User not found in database.");
+      return null;
+    }
+    const { district: userDistrict, subDistrict: userSubDistrict } = userRef.data();
 
-  // ✅ Check Database for Providers
-  const q = query(collection(db, "users"),
-    where("role", "==", "service_provider"),
-    where("district", "==", userDistrict),
-    where("subDistrict", "==", userSubDistrict)
-  );
+    // ✅ Fetch All Service Providers in the Same District & Sub-District
+    const q = query(collection(db, "users"),
+      where("role", "==", "service_provider"),
+      where("district", "==", userDistrict),
+      where("subDistrict", "==", userSubDistrict)
+    );
 
-  const providersSnapshot = await getDocs(q);
-  if (!providersSnapshot.empty) {
+    const providersSnapshot = await getDocs(q);
     let providers = [];
+
+    // ✅ Process DB Providers (if found)
     providersSnapshot.forEach(docSnap => {
       const provider = docSnap.data();
       let providerService = provider.service.toLowerCase().trim();
 
+      // **Partial Matching** (Plumber ≈ Plumbing)
       if (providerService.includes(serviceType) || serviceType.includes(providerService)) {
         providers.push({
           id: docSnap.id,
-          name: provider.name,
-          phone: provider.phone || "N/A",
-          address: provider.address || "N/A",
           rating: provider.rating || 0,
           completedJobs: provider.completedJobs || 0,
           availability: provider.availability || "Available",
           activeRequests: provider.activeRequests || 0,
-          signupDate: provider.signupDate || "9999-12-31"
+          signupDate: provider.signupDate || "9999-12-31" // Default oldest if missing
         });
       }
     });
 
-    if (providers.length > 0) {
-      let bestProvider = providers
-        .sort((a, b) => 
-          (b.rating + b.completedJobs) - (a.rating + a.completedJobs) ||
-          a.activeRequests - b.activeRequests ||
-          new Date(a.signupDate) - new Date(b.signupDate)
-        )
-        .find(provider => provider.availability === "Available");
+    // ✅ External Data Fallback (OSM Overpass API) if No Providers Found
+    if (providers.length === 0) {
+      console.log("No matching service providers found in DB. Searching OpenStreetMap...");
 
-      return bestProvider ? bestProvider : null;
+      const osmProviders = await fetchOSMServiceProviders(serviceType, userDistrict, userSubDistrict);
+      if (osmProviders.length > 0) {
+        console.log(`Found ${osmProviders.length} new providers. Storing them in Firestore...`);
+
+        // ✅ Store New Providers in Firestore
+        await storeProvidersInFirestore(osmProviders, userDistrict, userSubDistrict);
+
+        // ✅ Add new providers to the selection list
+        providers.push(...osmProviders);
+      }
     }
-  }
 
-  // ✅ **If No Provider Found, Search via OpenStreetMap API**
-  let newProvider = await findServiceProviderOSM(serviceType, userDistrict);
-  if (newProvider) {
-    await saveProviderToDatabase(newProvider); // Save to Firestore
-    return newProvider;
-  }
+    // ✅ No Providers Found at All
+    if (providers.length === 0) {
+      alert("No service providers available in your sub-district.");
+      return null;
+    }
 
-  alert("No service providers found in your area.");
-  return null;
-}
+    // ✅ **Smart Provider Selection** - Sort & Select Best
+    let bestProvider = providers
+      .filter(provider => provider.availability === "Available") // Only available providers
+      .sort((a, b) => 
+        (b.rating + b.completedJobs) - (a.rating + a.completedJobs) ||  // Prioritize High Ratings & Jobs
+        a.activeRequests - b.activeRequests ||  // Lower workload gets priority
+        new Date(a.signupDate) - new Date(b.signupDate) // Older signups get priority if all else is equal
+      )[0]; // Select the best one
 
-// ✅ **Find Service Provider using OpenStreetMap API**
-async function findServiceProviderOSM(serviceType, userDistrict) {
-  let url = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${userDistrict}`;
+    return bestProvider ? bestProvider.id : null;
 
-  try {
-    let response = await fetch(url);
-    let data = await response.json();
-
-    if (data.length === 0) return null;
-
-    let provider = {
-      name: data[0].display_name,
-      address: data[0].display_name,
-      phone: "N/A", // OSM does not provide phone numbers
-      rating: 0,
-      availability: "Available",
-      role: "service_provider",
-      service: serviceType,
-      district: userDistrict,
-      subDistrict: "N/A"
-    };
-
-    return provider;
   } catch (error) {
-    console.error("OSM API Error:", error);
+    console.error("Error in autoAssignServiceProvider:", error);
     return null;
   }
 }
 
-// ✅ **Save New Provider to Firestore**
-async function saveProviderToDatabase(provider) {
+/**
+ * ✅ Fetch Service Providers from OpenStreetMap Overpass API
+ */
+async function fetchOSMServiceProviders(serviceType, district, subDistrict) {
   try {
-    let providerRef = await addDoc(collection(db, "users"), provider);
-    console.log("New provider saved:", providerRef.id);
+    const osmQuery = `
+      [out:json];
+      node["craft"="${serviceType}"](area[name="${district}"]);
+      out;
+    `;
+
+    const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(osmQuery)}`);
+    const data = await response.json();
+
+    if (!data.elements) return [];
+
+    return data.elements.map(provider => ({
+      id: provider.id, // OSM ID
+      rating: 3, // Assume a neutral rating since OSM lacks this data
+      completedJobs: 0, // No data, default to 0
+      availability: "Available", // Assume available
+      activeRequests: 0, // No data, assume 0
+      signupDate: "9999-12-31", // Default
+      service: serviceType, 
+      district,
+      subDistrict
+    }));
   } catch (error) {
-    console.error("Error saving provider:", error);
+    console.error("Error fetching OSM providers:", error);
+    return [];
+  }
+}
+
+/**
+ * ✅ Store New Providers in Firestore
+ */
+async function storeProvidersInFirestore(providers, district, subDistrict) {
+  try {
+    const batch = writeBatch(db);
+    
+    providers.forEach(provider => {
+      const providerRef = doc(db, "users", provider.id.toString());
+      batch.set(providerRef, {
+        role: "service_provider",
+        service: provider.service,
+        district: district,
+        subDistrict: subDistrict,
+        rating: provider.rating,
+        completedJobs: provider.completedJobs,
+        availability: provider.availability,
+        activeRequests: provider.activeRequests,
+        signupDate: provider.signupDate
+      }, { merge: true });
+    });
+
+    await batch.commit();
+    console.log("New providers successfully stored in Firestore.");
+  } catch (error) {
+    console.error("Error storing new providers in Firestore:", error);
   }
 }
 
