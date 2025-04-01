@@ -181,16 +181,14 @@ document.getElementById("request-service-form").addEventListener("submit", async
 async function autoAssignServiceProvider() {
   let serviceType = document.getElementById("service").value.toLowerCase().trim();
 
-  // ✅ Get User's District & Sub-District
+  // ✅ Get User's Sub-District
   const userRef = await getDoc(doc(db, "users", userId));
   if (!userRef.exists()) return null;
-  const userDistrict = userRef.data().district;
   const userSubDistrict = userRef.data().subDistrict;
 
   // ✅ Check Firestore for Providers
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
-    where("district", "==", userDistrict),
     where("subDistrict", "==", userSubDistrict)
   );
 
@@ -228,7 +226,7 @@ async function autoAssignServiceProvider() {
   }
 
   // ✅ **If No Provider Found, Search External APIs**
-  let newProvider = await findServiceProviderEnhanced(serviceType, userDistrict, userSubDistrict);
+  let newProvider = await findServiceProviderEnhanced(serviceType, userSubDistrict);
   if (newProvider) {
     return newProvider.id; // Return newly added provider's ID
   }
@@ -236,26 +234,25 @@ async function autoAssignServiceProvider() {
 }
 
 // ✅ **Find Service Provider using OpenStreetMap + Yelp API**
-async function findServiceProviderEnhanced(serviceType, userDistrict, userSubDistrict) {
-  let osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${userDistrict}&extratags=1`;
+async function findServiceProviderEnhanced(serviceType, userSubDistrict) {
+  let osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${userSubDistrict}&extratags=1`;
   try {
     let response = await fetch(osmUrl);
     let data = await response.json();
 
     if (data.length === 0) {
       console.log("No providers found via OSM. Trying Yelp...");
-      return await findServiceProviderYelp(serviceType, userDistrict); // Try Yelp API
+      return await findServiceProviderYelp(serviceType, userSubDistrict); // Try Yelp API
     }
 
     // ✅ Extract & Store Provider Info (if OSM finds a match)
     let provider = {
       name: data[0].display_name.split(",")[0], 
       address: data[0].display_name,
-      phone: data[0].extratags?.phone || "Not Available", // Extract phone if available
+      phone: data[0].extratags?.phone || "Not Available", 
       website: data[0].extratags?.website || "Not Available",
       role: "service_provider",
       service: serviceType,
-      district: userDistrict,
       subDistrict: userSubDistrict,
       rating: 0,
       completedJobs: 0,
@@ -278,13 +275,13 @@ async function findServiceProviderEnhanced(serviceType, userDistrict, userSubDis
 }
 
 // ✅ **Find Service Provider using Yelp API (More Accurate)**
-async function findServiceProviderYelp(serviceType, userDistrict) {
-  let yelpUrl = `https://api.yelp.com/v3/businesses/search?term=${serviceType}&location=${userDistrict}&limit=1`;
+async function findServiceProviderYelp(serviceType, userSubDistrict) {
+  let yelpUrl = `https://api.yelp.com/v3/businesses/search?term=${serviceType}&location=${userSubDistrict}&limit=1`;
   
   try {
     let response = await fetch(yelpUrl, {
       headers: {
-        "Authorization": `Bearer YOUR_YELP_API_KEY` // Get API key from Yelp
+        "Authorization": `Bearer YOUR_YELP_API_KEY` 
       }
     });
 
@@ -303,8 +300,7 @@ async function findServiceProviderYelp(serviceType, userDistrict) {
       website: business.url || "Not Available",
       role: "service_provider",
       service: serviceType,
-      district: userDistrict,
-      subDistrict: "Unknown",
+      subDistrict: userSubDistrict,
       rating: business.rating || 0,
       completedJobs: 0,
       availability: "Available",
@@ -324,6 +320,7 @@ async function findServiceProviderYelp(serviceType, userDistrict) {
     return null;
   }
 }
+
 
 
 
