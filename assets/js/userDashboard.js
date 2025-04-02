@@ -217,79 +217,29 @@ async function autoAssignServiceProvider() {
   return null;
 }
 
-// ✅ **Find Providers by Sub-District or District**
-async function findProviders(serviceType, location) {
-  const q = query(collection(db, "users"),
-    where("role", "==", "service_provider"),
-    where("subDistrict", "==", location) // This will work for both sub-district and district search
-  );
-
-  const providersSnapshot = await getDocs(q);
-  let providers = [];
-  if (!providersSnapshot.empty) {
-    providersSnapshot.forEach(docSnap => {
-      const provider = docSnap.data();
-      let providerService = provider.service.toLowerCase().trim();
-
-      // ✅ **Better Matching** (Plumber ≈ Plumbing)
-      if (providerService.includes(serviceType) || serviceType.includes(providerService)) {
-        providers.push({
-          id: docSnap.id,
-          rating: provider.rating || 0,
-          completedJobs: provider.completedJobs || 0,
-          availability: provider.availability || "Available",
-          activeRequests: provider.activeRequests || 0,
-          signupDate: provider.signupDate || "9999-12-31"
-        });
-      }
-    });
-  }
-
-  return providers;
-}
-
-// ✅ **Find Service Provider using OpenStreetMap + Yelp API**
+// ✅ **Find Service Provider using OpenStreetMap + Yelp + Google + Foursquare**
 async function findServiceProviderEnhanced(serviceType, userSubDistrict) {
   let osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${userSubDistrict}&extratags=1`;
+  
   try {
     let response = await fetch(osmUrl);
     let data = await response.json();
 
     if (data.length === 0) {
       console.log("No providers found via OSM. Trying Yelp...");
-      return await findServiceProviderYelp(serviceType, userSubDistrict); // Try Yelp API
+      return await findServiceProviderYelp(serviceType, userSubDistrict);
     }
 
-    // ✅ Extract & Store Provider Info (if OSM finds a match)
-    let provider = {
-      name: data[0].display_name.split(",")[0], 
-      address: data[0].display_name,
-      phone: data[0].extratags?.phone || "Not Available", 
-      website: data[0].extratags?.website || "Not Available",
-      role: "service_provider",
-      service: serviceType,
-      subDistrict: userSubDistrict,
-      rating: 0,
-      completedJobs: 0,
-      availability: "Available",
-      activeRequests: 0,
-      signupDate: new Date().toISOString()
-    };
-
-    // ✅ Add New Provider to Firestore
-    const docRef = await addDoc(collection(db, "users"), provider);
-    provider.id = docRef.id;
-
-    alert(`New service provider added: ${provider.name}`);
+    let provider = await storeNewProvider(data[0], serviceType, userSubDistrict);
     return provider;
-
+  
   } catch (error) {
     console.error("OSM API Error:", error);
-    return null;
+    return await findServiceProviderYelp(serviceType, userSubDistrict);
   }
 }
 
-// ✅ **Find Service Provider using Yelp API (More Accurate)**
+// ✅ **Find Service Provider using Yelp API**
 async function findServiceProviderYelp(serviceType, userSubDistrict) {
   let yelpUrl = `https://api.yelp.com/v3/businesses/search?term=${serviceType}&location=${userSubDistrict}&limit=1`;
   
@@ -302,38 +252,140 @@ async function findServiceProviderYelp(serviceType, userSubDistrict) {
 
     let data = await response.json();
     if (data.businesses.length === 0) {
-      alert("No service providers found via Yelp either.");
-      return null;
+      console.log("No service providers found via Yelp. Trying Google...");
+      return await findServiceProviderGoogle(serviceType, userSubDistrict);
     }
 
-    let business = data.businesses[0];
-
-    let provider = {
-      name: business.name,
-      address: business.location.address1,
-      phone: business.phone || "Not Available",
-      website: business.url || "Not Available",
-      role: "service_provider",
-      service: serviceType,
-      subDistrict: userSubDistrict,
-      rating: business.rating || 0,
-      completedJobs: 0,
-      availability: "Available",
-      activeRequests: 0,
-      signupDate: new Date().toISOString()
-    };
-
-    // ✅ Add to Firestore
-    const docRef = await addDoc(collection(db, "users"), provider);
-    provider.id = docRef.id;
-
-    alert(`New service provider added from Yelp: ${provider.name}`);
+    let provider = await storeNewProvider(data.businesses[0], serviceType, userSubDistrict);
     return provider;
 
   } catch (error) {
     console.error("Yelp API Error:", error);
+    return await findServiceProviderGoogle(serviceType, userSubDistrict);
+  }
+}
+
+// ✅ **Find Service Provider using Google Places API**
+async function findServiceProviderGoogle(serviceType, userSubDistrict) {
+  let googleUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${serviceType}+in+${userSubDistrict}&key=YOUR_GOOGLE_API_KEY`;
+  
+  try {
+    let response = await fetch(googleUrl);
+    let data = await response.json();
+
+    if (!data.results.length) {
+      console.log("No service providers found via Google. Trying Foursquare...");
+      return await findServiceProviderFoursquare(serviceType, userSubDistrict);
+    }
+
+    let provider = await storeNewProvider(data.results[0], serviceType, userSubDistrict);
+    return provider;
+
+  } catch (error) {
+    console.error("Google API Error:", error);
+    return await findServiceProviderFoursquare(serviceType, userSubDistrict);
+  }
+}
+
+// ✅ **Find Service Provider using Foursquare API**
+async function findServiceProviderFoursquare(serviceType, userSubDistrict) {
+  let foursquareUrl = `https://api.foursquare.com/v3/places/search?query=${serviceType}&near=${userSubDistrict}`;
+  
+  try {
+    let response = await fetch(foursquareUrl, {
+      headers: { "Authorization": "YOUR_FOURSQUARE_API_KEY" }
+    });
+
+    let data = await response.json();
+    if (!data.results.length) {
+      alert("No service providers found via Foursquare either.");
+      return null;
+    }
+
+    let provider = await storeNewProvider(data.results[0], serviceType, userSubDistrict);
+    return provider;
+
+  } catch (error) {
+    console.error("Foursquare API Error:", error);
     return null;
   }
+}
+
+// ✅ **Store New Provider in Firestore**
+async function storeNewProvider(providerData, serviceType, userSubDistrict) {
+  let provider = {
+    name: providerData.name || providerData.display_name.split(",")[0],
+    address: providerData.address || providerData.location?.formatted_address || "Unknown Address",
+    phone: providerData.phone || providerData.extratags?.phone || "Not Available",
+    website: providerData.website || providerData.url || providerData.extratags?.website || "Not Available",
+    role: "service_provider",
+    service: serviceType,
+    subDistrict: userSubDistrict,
+    rating: providerData.rating || 0,
+    completedJobs: 0,
+    availability: "Available",
+    activeRequests: 0,
+    signupDate: new Date().toISOString()
+  };
+
+  const docRef = await addDoc(collection(db, "users"), provider);
+  provider.id = docRef.id;
+
+  alert(`New service provider added: ${provider.name}`);
+  return provider;
+}
+
+// ✅ **Find Providers from Firestore with Improved Matching**
+async function findProviders(serviceType, location) {
+  const q = query(collection(db, "users"),
+    where("role", "==", "service_provider"),
+    where("subDistrict", "==", location)
+  );
+
+  const providersSnapshot = await getDocs(q);
+  let providers = [];
+  
+  if (!providersSnapshot.empty) {
+    providersSnapshot.forEach(docSnap => {
+      const provider = docSnap.data();
+      let providerService = provider.service.toLowerCase().trim();
+
+      if (fuzzyMatch(providerService, serviceType)) {
+        providers.push({
+          id: docSnap.id,
+          rating: provider.rating || 0,
+          completedJobs: provider.completedJobs || 0,
+          availability: provider.availability || "Available",
+          activeRequests: provider.activeRequests || 0,
+          signupDate: provider.signupDate || "9999-12-31"
+        });
+      }
+    });
+  }
+  return providers;
+}
+
+// ✅ **Fuzzy Matching using Levenshtein Distance**
+function fuzzyMatch(a, b) {
+  return a.includes(b) || b.includes(a) || levenshteinDistance(a, b) <= 2;
+}
+
+// ✅ **Levenshtein Distance Calculation**
+function levenshteinDistance(s1, s2) {
+  const dp = Array(s2.length + 1).fill().map(() => Array(s1.length + 1).fill(0));
+  for (let i = 0; i <= s2.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= s1.length; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= s2.length; i++) {
+    for (let j = 1; j <= s1.length; j++) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (s1[j - 1] === s2[i - 1] ? 0 : 1)
+      );
+    }
+  }
+  return dp[s2.length][s1.length];
 }
 
 
