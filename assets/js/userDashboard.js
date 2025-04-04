@@ -293,7 +293,7 @@ async function findServiceProviderFoursquare(serviceType, userSubDistrict) {
   
   try {
     let response = await fetch(foursquareUrl, {
-      headers: { "Authorization": "YOUR_FOURSQUARE_API_KEY" }
+      headers: { "Authorization": "fsq3zz12Qn2PtWIQM1J5Vz+da3Q/SzGR9H9X+W3IjMPYFZo=" }
     });
 
     let data = await response.json();
