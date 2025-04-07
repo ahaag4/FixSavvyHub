@@ -176,195 +176,187 @@ document.getElementById("request-service-form").addEventListener("submit", async
   location.reload();
 });
 
-
-// ✅ Enhanced Auto Assign Best Service Provider
+// Main Auto-Assignment Function
 async function autoAssignServiceProvider(userId) {
   const serviceType = document.getElementById("service").value.toLowerCase().trim();
   if (!serviceType) throw new Error("Service type is required");
 
   const userRef = await getDoc(doc(db, "users", userId));
   if (!userRef.exists()) throw new Error("User not found");
-  const userData = userRef.data();
-  const userSubDistrict = userData.subDistrict || "Unknown Sub-District";
-  const userDistrict = userData.district || "Unknown District";
 
-  let providers = await findProviders(serviceType, userSubDistrict);
+  const userData = userRef.data();
+  const subDistrict = userData.subDistrict || "Unknown Sub-District";
+  const district = userData.district || "Unknown District";
+
+  let providers = await findProviders(serviceType, subDistrict);
   if (providers.length === 0) {
-    console.log(`No providers in ${userSubDistrict}. Searching in ${userDistrict}...`);
-    providers = await findProviders(serviceType, userDistrict);
+    console.log(`No providers in ${subDistrict}. Trying in ${district}...`);
+    providers = await findProviders(serviceType, district);
   }
 
   if (providers.length > 0) {
-    const bestProvider = providers
+    const best = providers
       .filter(p => p.availability === "Available" && p.activeRequests < 10)
       .sort((a, b) => {
-        const scoreA = (b.rating * 10 + b.completedJobs) - (a.rating * 10 + a.completedJobs);
-        const loadA = a.activeRequests - b.activeRequests;
-        const seniorityA = new Date(a.signupDate) - new Date(b.signupDate);
-        return scoreA || loadA || seniorityA;
+        const scoreA = b.rating * 10 + b.completedJobs;
+        const scoreB = a.rating * 10 + a.completedJobs;
+        const loadDiff = a.activeRequests - b.activeRequests;
+        const seniority = new Date(a.signupDate) - new Date(b.signupDate);
+        return scoreA || loadDiff || seniority;
       })[0];
-    return bestProvider ? bestProvider.id : null;
+    return best ? best.id : null;
   }
 
-  const newProvider = await findServiceProviderEnhanced(serviceType, userSubDistrict, userDistrict);
+  const newProvider = await findServiceProviderEnhanced(serviceType, subDistrict, district);
   return newProvider ? newProvider.id : null;
 }
 
-// ✅ Enhanced External API Search with More APIs
+// Tries all supported APIs in fallback sequence
 async function findServiceProviderEnhanced(serviceType, subDistrict, district) {
   const apis = [
     { fn: findServiceProviderOSM, name: "OpenStreetMap" },
-    { fn: findServiceProviderYelp, name: "Yelp" },
-    { fn: findServiceProviderGoogle, name: "Google Places" },
     { fn: findServiceProviderFoursquare, name: "Foursquare" },
-    { fn: findServiceProviderHere, name: "Here Maps" }, // New API
-    { fn: findServiceProviderMapQuest, name: "MapQuest" } // New API
+    { fn: findServiceProviderGoogle, name: "Google Places" },
+    { fn: findServiceProviderYelp, name: "Yelp" },
+    { fn: findServiceProviderHere, name: "Here Maps" },
+    { fn: findServiceProviderMapQuest, name: "MapQuest" }
   ];
 
   for (const api of apis) {
     try {
       const provider = await retry(api.fn, 2, 1000)(serviceType, subDistrict || district);
       if (provider) return provider;
-      console.log(`No providers found via ${api.name}. Trying next...`);
     } catch (error) {
-      console.error(`${api.name} API Error:`, error);
+      console.warn(`API Failed (${api.name}):`, error.message);
     }
   }
-  alert("No service providers found across all APIs.");
+  alert("No providers found using any API.");
   return null;
 }
 
-// ✅ Retry Logic for API Calls
+// Retry wrapper for unstable APIs
 function retry(fn, retries = 3, delay = 500) {
   return async (...args) => {
     for (let i = 0; i < retries; i++) {
       try {
         return await fn(...args);
-      } catch (error) {
-        if (i === retries - 1) throw error;
-        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+      } catch (err) {
+        if (i === retries - 1) throw err;
+        await new Promise(res => setTimeout(res, delay * (i + 1)));
       }
     }
   };
 }
 
-// ✅ OSM Provider Search
+// API: OpenStreetMap (No Key)
 async function findServiceProviderOSM(serviceType, location) {
-  const osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(`${serviceType} in ${location}`)}&limit=1&extratags=1`;
-  const response = await fetch(osmUrl, { headers: { "User-Agent": "AutoAssign/1.0" } });
-  const data = await response.json();
-  if (!data.length) return null;
-  return await storeNewProvider(data[0], serviceType, location);
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(serviceType + " in " + location)}&limit=1&extratags=1`;
+  const res = await fetch(url, { headers: { "User-Agent": "FixSavvyBot/1.0" } });
+  const data = await res.json();
+  return data.length ? await storeNewProvider(data[0], serviceType, location) : null;
 }
 
-// ✅ Yelp Provider Search
-async function findServiceProviderYelp(serviceType, location) {
-  const yelpUrl = `https://api.yelp.com/v3/businesses/search?term=${encodeURIComponent(serviceType)}&location=${encodeURIComponent(location)}&limit=1`;
-  const response = await fetch(yelpUrl, {
-    headers: { "Authorization": "Bearer YOUR_YELP_API_KEY" }
-  });
-  const data = await response.json();
-  if (!data.businesses?.length) return null;
-  return await storeNewProvider(data.businesses[0], serviceType, location);
-}
-
-// ✅ Google Places Provider Search
-async function findServiceProviderGoogle(serviceType, location) {
-  const googleUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(`${serviceType} in ${location}`)}&key=YOUR_GOOGLE_API_KEY`;
-  const response = await fetch(googleUrl);
-  const data = await response.json();
-  if (!data.results?.length) return null;
-  return await storeNewProvider(data.results[0], serviceType, location);
-}
-
-// ✅ Foursquare Provider Search
+// API: Foursquare
 async function findServiceProviderFoursquare(serviceType, location) {
-  const foursquareUrl = `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(serviceType)}&near=${encodeURIComponent(location)}&limit=1`;
-  const response = await fetch(foursquareUrl, {
-    headers: { "Authorization": "fsq3zz12Qn2PtWIQM1J5Vz+da3Q/SzGR9H9X+W3IjMPYFZo=" }
+  const url = `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(serviceType)}&near=${encodeURIComponent(location)}&limit=1`;
+  const res = await fetch(url, {
+    headers: { "Authorization": "fsq3zz12Qn2PtWIQM1J5Vz+da3Q/SzGR9H9X+W3IjMPYFZo=" } // Replace if needed
   });
-  const data = await response.json();
-  if (!data.results?.length) return null;
-  return await storeNewProvider(data.results[0], serviceType, location);
+  const data = await res.json();
+  return data.results?.length ? await storeNewProvider(data.results[0], serviceType, location) : null;
 }
 
-// ✅ Here Maps Provider Search (New API)
+// API: Google Places
+async function findServiceProviderGoogle(serviceType, location) {
+  const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(serviceType + " in " + location)}&key=YOUR_GOOGLE_API_KEY`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.results?.length ? await storeNewProvider(data.results[0], serviceType, location) : null;
+}
+
+// API: Yelp
+async function findServiceProviderYelp(serviceType, location) {
+  const url = `https://api.yelp.com/v3/businesses/search?term=${encodeURIComponent(serviceType)}&location=${encodeURIComponent(location)}&limit=1`;
+  const res = await fetch(url, {
+    headers: { Authorization: "Bearer YOUR_YELP_API_KEY" }
+  });
+  const data = await res.json();
+  return data.businesses?.length ? await storeNewProvider(data.businesses[0], serviceType, location) : null;
+}
+
+// API: Here Maps
 async function findServiceProviderHere(serviceType, location) {
-  const hereUrl = `https://discover.search.hereapi.com/v1/discover?at=0,0&q=${encodeURIComponent(`${serviceType} in ${location}`)}&limit=1&apiKey=YOUR_HERE_API_KEY`;
-  const response = await fetch(hereUrl);
-  const data = await response.json();
-  if (!data.items?.length) return null;
-  return await storeNewProvider(data.items[0], serviceType, location);
+  const url = `https://discover.search.hereapi.com/v1/discover?q=${encodeURIComponent(serviceType + " in " + location)}&at=0,0&limit=1&apiKey=YOUR_HERE_API_KEY`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.items?.length ? await storeNewProvider(data.items[0], serviceType, location) : null;
 }
 
-// ✅ MapQuest Provider Search (New API)
+// API: MapQuest
 async function findServiceProviderMapQuest(serviceType, location) {
-  const mapquestUrl = `https://www.mapquestapi.com/search/v2/search?key=YOUR_MAPQUEST_API_KEY&query=${encodeURIComponent(`${serviceType} in ${location}`)}&maxMatches=1`;
-  const response = await fetch(mapquestUrl);
-  const data = await response.json();
-  if (!data.searchResults?.length) return null;
-  return await storeNewProvider(data.searchResults[0], serviceType, location);
+  const url = `https://www.mapquestapi.com/search/v2/search?key=YOUR_MAPQUEST_API_KEY&query=${encodeURIComponent(serviceType + " in " + location)}&maxMatches=1`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.searchResults?.length ? await storeNewProvider(data.searchResults[0], serviceType, location) : null;
 }
 
-// ✅ Store New Provider with Enhanced Data Normalization
-async function storeNewProvider(providerData, serviceType, location) {
+// Normalize and add provider to Firestore
+async function storeNewProvider(data, serviceType, location) {
   const provider = {
-    name: providerData.name || providerData.display_name?.split(",")[0] || providerData.title || "Unnamed Provider",
-    address: providerData.address || providerData.location?.formatted_address || providerData.position || "Unknown",
-    phone: providerData.phone || providerData.extratags?.phone || providerData.contact?.phone || "N/A",
-    website: providerData.website || providerData.url || providerData.extratags?.website || "N/A",
-    role: "service_provider",
+    name: data.name || data.display_name?.split(",")[0] || data.title || "Unknown",
+    address: data.address || data.location?.formatted_address || data.vicinity || "Not Provided",
+    phone: data.phone || data.extratags?.phone || data.contact?.phone || "N/A",
+    website: data.website || data.url || data.extratags?.website || "N/A",
     service: serviceType,
     subDistrict: location.includes("Unknown") ? null : location,
-    rating: providerData.rating ? Math.min(parseFloat(providerData.rating), 5) : 0,
+    role: "service_provider",
+    rating: data.rating ? Math.min(parseFloat(data.rating), 5) : 0,
     completedJobs: 0,
     availability: "Available",
     activeRequests: 0,
     signupDate: new Date().toISOString()
   };
 
-  const docRef = await addDoc(collection(db, "users"), provider);
-  provider.id = docRef.id;
+  const ref = await addDoc(collection(db, "users"), provider);
+  provider.id = ref.id;
   alert(`New provider added: ${provider.name}`);
   return provider;
 }
 
-// ✅ Enhanced Provider Search in Firestore
+// Firestore Provider Lookup
 async function findProviders(serviceType, location) {
   const q = query(
     collection(db, "users"),
     where("role", "==", "service_provider"),
     where("subDistrict", "==", location)
   );
+  const snap = await getDocs(q);
+  const results = [];
 
-  const providersSnapshot = await getDocs(q);
-  const providers = [];
-
-  providersSnapshot.forEach(docSnap => {
-    const provider = docSnap.data();
-    const providerService = provider.service.toLowerCase().trim();
-    if (fuzzyMatch(providerService, serviceType)) {
-      providers.push({
+  snap.forEach(docSnap => {
+    const p = docSnap.data();
+    if (fuzzyMatch(p.service, serviceType)) {
+      results.push({
         id: docSnap.id,
-        rating: provider.rating || 0,
-        completedJobs: provider.completedJobs || 0,
-        availability: provider.availability || "Available",
-        activeRequests: provider.activeRequests || 0,
-        signupDate: provider.signupDate || "9999-12-31"
+        rating: p.rating || 0,
+        completedJobs: p.completedJobs || 0,
+        availability: p.availability || "Available",
+        activeRequests: p.activeRequests || 0,
+        signupDate: p.signupDate || "9999-12-31"
       });
     }
   });
-  return providers;
+  return results;
 }
 
-// ✅ Enhanced Fuzzy Matching
+// Fuzzy Match
 function fuzzyMatch(a, b) {
   a = a.toLowerCase().trim();
   b = b.toLowerCase().trim();
-  return a.includes(b) || b.includes(a) || levenshteinDistance(a, b) <= Math.max(2, Math.min(a.length, b.length) * 0.2);
+  return a.includes(b) || b.includes(a) || levenshteinDistance(a, b) <= 2;
 }
 
-// ✅ Optimized Levenshtein Distance
+// Levenshtein Distance
 function levenshteinDistance(s1, s2) {
   if (s1 === s2) return 0;
   if (!s1.length) return s2.length;
