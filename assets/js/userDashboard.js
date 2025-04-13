@@ -176,22 +176,18 @@ document.getElementById("request-service-form").addEventListener("submit", async
   location.reload();
 });
 
+
 // ✅ Function to Auto Assign Best Service Provider
-async function autoAssignServiceProvider(userId) { // Added userId parameter for consistency
+async function autoAssignServiceProvider() {
   let serviceType = document.getElementById("service").value.toLowerCase().trim();
-  if (!serviceType) {
-    console.error("Service type is required");
-    return null;
-  }
 
   // ✅ Get User's Sub-District
   const userRef = await getDoc(doc(db, "users", userId));
-  if (!userRef.exists()) {
-    console.error("User not found");
-    return null;
-  }
-  const userSubDistrict = userRef.data().subDistrict || "Unknown Sub-District";
-  const userDistrict = userRef.data().district || "Unknown District";
+  if (!userRef.exists()) return null;
+  const userSubDistrict = userRef.data().subDistrict;
+  const userDistrict = userRef.data().district; // Assuming district is also available
+  const userCity = userRef.data().city; // City level fallback
+  const userState = userRef.data().state; // State level fallback
 
   // ✅ Check Firestore for Providers in Sub-District
   let providers = await findProviders(serviceType, userSubDistrict);
@@ -200,6 +196,12 @@ async function autoAssignServiceProvider(userId) { // Added userId parameter for
   if (providers.length === 0) {
     console.log("No providers found in sub-district. Searching in district...");
     providers = await findProviders(serviceType, userDistrict);
+  }
+
+  // ✅ If still no providers, search in City
+  if (providers.length === 0) {
+    console.log("No providers found in district. Searching in city...");
+    providers = await findProviders(serviceType, userCity);
   }
 
   // ✅ If Providers are found, sort and return the best one
@@ -215,141 +217,260 @@ async function autoAssignServiceProvider(userId) { // Added userId parameter for
     return bestProvider ? bestProvider.id : null;
   }
 
-  // ✅ If No Provider Found, Search External APIs
-  let newProvider = await findServiceProviderEnhanced(serviceType, userSubDistrict, userDistrict);
+  // ✅ **If No Provider Found, Search External APIs**
+  console.log("No local providers found. Searching external APIs...");
+  let newProvider = await findServiceProviderEnhanced(serviceType, userSubDistrict, userDistrict, userCity, userState);
   if (newProvider) {
     return newProvider.id; // Return newly added provider's ID
   }
   return null;
 }
 
-// ✅ Find Service Provider using Multiple APIs
-async function findServiceProviderEnhanced(serviceType, userSubDistrict, userDistrict) {
-  const apis = [
-    { fn: findServiceProviderOSM, name: "OpenStreetMap" },
-    { fn: findServiceProviderYelp, name: "Yelp" },
-    { fn: findServiceProviderGoogle, name: "Google Places" },
-    { fn: findServiceProviderFoursquare, name: "Foursquare" },
-    { fn: findServiceProviderHere, name: "Here Maps" },
-    { fn: findServiceProviderMapQuest, name: "MapQuest" },
-    { fn: findServiceProviderBing, name: "Bing Places" },
-    { fn: findServiceProviderYellowPages, name: "Yellow Pages" }
-  ];
-
-  for (const api of apis) {
+// ✅ **Find Service Provider using Multiple APIs**
+async function findServiceProviderEnhanced(serviceType, subDistrict, district, city, state) {
+  // Try APIs in order of reliability and cost
+  const locationHierarchy = [subDistrict, district, city, state];
+  
+  for (const location of locationHierarchy) {
+    if (!location) continue;
+    
     try {
-      const provider = await api.fn(serviceType, userSubDistrict || userDistrict);
+      // Try free APIs first
+      let provider = await tryFreeAPIs(serviceType, location);
       if (provider) return provider;
-      console.log(`No providers found via ${api.name}. Trying next...`);
+      
+      // Then try APIs that require keys
+      provider = await tryKeyAPIs(serviceType, location);
+      if (provider) return provider;
+      
     } catch (error) {
-      console.error(`${api.name} API Error:`, error);
+      console.error(`Error searching in ${location}:`, error);
     }
   }
-  alert("No service providers found across all APIs.");
+  
   return null;
 }
 
-// ✅ OpenStreetMap Provider Search (No API Key)
-async function findServiceProviderOSM(serviceType, location) {
-  let osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(`${serviceType} in ${location}`)}&extratags=1&limit=1`;
-  let response = await fetch(osmUrl, { headers: { "User-Agent": "AutoAssign/1.0" } });
-  let data = await response.json();
-  if (!data.length) return null;
-  return await storeNewProvider(data[0], serviceType, location);
+// ✅ **Try Free APIs (no API key required)**
+async function tryFreeAPIs(serviceType, location) {
+  // 1. OpenStreetMap (Nominatim)
+  try {
+    let osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${location}&extratags=1`;
+    let response = await fetch(osmUrl);
+    let data = await response.json();
+    
+    if (data.length > 0) {
+      console.log("Found provider via OpenStreetMap");
+      return await storeNewProvider(data[0], serviceType, location);
+    }
+  } catch (error) {
+    console.error("OpenStreetMap API Error:", error);
+  }
+
+  // 2. Overpass API (for OpenStreetMap data)
+  try {
+    let overpassQuery = `[out:json][timeout:25];(node["shop"~"${serviceType}"](around:5000,${location});way["shop"~"${serviceType}"](around:5000,${location}););out body;>;out skel qt;`;
+    let overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
+    let response = await fetch(overpassUrl);
+    let data = await response.json();
+    
+    if (data.elements && data.elements.length > 0) {
+      console.log("Found provider via Overpass API");
+      return await storeNewProvider(data.elements[0], serviceType, location);
+    }
+  } catch (error) {
+    console.error("Overpass API Error:", error);
+  }
+
+  // 3. Geonames (free tier available)
+  try {
+    let geonamesUrl = `http://api.geonames.org/searchJSON?q=${serviceType}&name_equals=${location}&maxRows=1&username=demo`;
+    let response = await fetch(geonamesUrl);
+    let data = await response.json();
+    
+    if (data.geonames && data.geonames.length > 0) {
+      console.log("Found provider via Geonames");
+      return await storeNewProvider(data.geonames[0], serviceType, location);
+    }
+  } catch (error) {
+    console.error("Geonames API Error:", error);
+  }
+
+  // 4. Mapbox (free tier available)
+  try {
+    let mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${serviceType}.json?proximity=${location}&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw`;
+    let response = await fetch(mapboxUrl);
+    let data = await response.json();
+    
+    if (data.features && data.features.length > 0) {
+      console.log("Found provider via Mapbox");
+      return await storeNewProvider(data.features[0], serviceType, location);
+    }
+  } catch (error) {
+    console.error("Mapbox API Error:", error);
+  }
+
+  return null;
 }
 
-// ✅ Yelp Provider Search (API Key Required)
-async function findServiceProviderYelp(serviceType, location) {
-  let yelpUrl = `https://api.yelp.com/v3/businesses/search?term=${encodeURIComponent(serviceType)}&location=${encodeURIComponent(location)}&limit=1`;
-  let response = await fetch(yelpUrl, {
-    headers: { "Authorization": "Bearer YOUR_YELP_API_KEY" }
-  });
-  let data = await response.json();
-  if (!data.businesses?.length) return null;
-  return await storeNewProvider(data.businesses[0], serviceType, location);
+// ✅ **Try APIs that require API keys**
+async function tryKeyAPIs(serviceType, location) {
+  // 1. Yelp Fusion API
+  try {
+    let yelpUrl = `https://api.yelp.com/v3/businesses/search?term=${serviceType}&location=${location}&limit=1`;
+    let response = await fetch(yelpUrl, {
+      headers: {
+        "Authorization": `Bearer ${YOUR_YELP_API_KEY}` 
+      }
+    });
+
+    let data = await response.json();
+    if (data.businesses && data.businesses.length > 0) {
+      console.log("Found provider via Yelp");
+      return await storeNewProvider(data.businesses[0], serviceType, location);
+    }
+  } catch (error) {
+    console.error("Yelp API Error:", error);
+  }
+
+  // 2. Google Places API
+  try {
+    let googleUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${serviceType}+in+${location}&key=${YOUR_GOOGLE_API_KEY}`;
+    let response = await fetch(googleUrl);
+    let data = await response.json();
+
+    if (data.results && data.results.length > 0) {
+      console.log("Found provider via Google Places");
+      return await storeNewProvider(data.results[0], serviceType, location);
+    }
+  } catch (error) {
+    console.error("Google Places API Error:", error);
+  }
+
+  // 3. Foursquare API
+  try {
+    let foursquareUrl = `https://api.foursquare.com/v3/places/search?query=${serviceType}&near=${location}`;
+    let response = await fetch(foursquareUrl, {
+      headers: { "Authorization": "fsq3zz12Qn2PtWIQM1J5Vz+da3Q/SzGR9H9X+W3IjMPYFZo=" }
+    });
+
+    let data = await response.json();
+    if (data.results && data.results.length > 0) {
+      console.log("Found provider via Foursquare");
+      return await storeNewProvider(data.results[0], serviceType, location);
+    }
+  } catch (error) {
+    console.error("Foursquare API Error:", error);
+  }
+
+  // 4. TomTom Search API
+  try {
+    let tomtomUrl = `https://api.tomtom.com/search/2/search/${serviceType}.json?limit=1&countrySet=US&lat=37.7749&lon=-122.4194&key=${YOUR_TOMTOM_API_KEY}`;
+    let response = await fetch(tomtomUrl);
+    let data = await response.json();
+
+    if (data.results && data.results.length > 0) {
+      console.log("Found provider via TomTom");
+      return await storeNewProvider(data.results[0], serviceType, location);
+    }
+  } catch (error) {
+    console.error("TomTom API Error:", error);
+  }
+
+  // 5. Here Places API
+  try {
+    let hereUrl = `https://discover.search.hereapi.com/v1/discover?at=40.730610,-73.935242&q=${serviceType}&limit=1&apiKey=${YOUR_HERE_API_KEY}`;
+    let response = await fetch(hereUrl);
+    let data = await response.json();
+
+    if (data.items && data.items.length > 0) {
+      console.log("Found provider via Here");
+      return await storeNewProvider(data.items[0], serviceType, location);
+    }
+  } catch (error) {
+    console.error("Here API Error:", error);
+  }
+
+  return null;
 }
 
-// ✅ Google Places Provider Search (API Key Required)
-async function findServiceProviderGoogle(serviceType, location) {
-  let googleUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(`${serviceType} in ${location}`)}&key=YOUR_GOOGLE_API_KEY`;
-  let response = await fetch(googleUrl);
-  let data = await response.json();
-  if (!data.results?.length) return null;
-  return await storeNewProvider(data.results[0], serviceType, location);
-}
-
-// ✅ Foursquare Provider Search (API Key Required)
-async function findServiceProviderFoursquare(serviceType, location) {
-  let foursquareUrl = `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(serviceType)}&near=${encodeURIComponent(location)}&limit=1`;
-  let response = await fetch(foursquareUrl, {
-    headers: { "Authorization": "fsq3zz12Qn2PtWIQM1J5Vz+da3Q/SzGR9H9X+W3IjMPYFZo=" }
-  });
-  let data = await response.json();
-  if (!data.results?.length) return null;
-  return await storeNewProvider(data.results[0], serviceType, location);
-}
-
-// ✅ Here Maps Provider Search (API Key Required)
-async function findServiceProviderHere(serviceType, location) {
-  let hereUrl = `https://discover.search.hereapi.com/v1/discover?at=0,0&q=${encodeURIComponent(`${serviceType} in ${location}`)}&limit=1&apiKey=YOUR_HERE_API_KEY`;
-  let response = await fetch(hereUrl);
-  let data = await response.json();
-  if (!data.items?.length) return null;
-  return await storeNewProvider(data.items[0], serviceType, location);
-}
-
-// ✅ MapQuest Provider Search (API Key Required)
-async function findServiceProviderMapQuest(serviceType, location) {
-  let mapquestUrl = `https://www.mapquestapi.com/search/v2/search?key=YOUR_MAPQUEST_API_KEY&query=${encodeURIComponent(`${serviceType} in ${location}`)}&maxMatches=1`;
-  let response = await fetch(mapquestUrl);
-  let data = await response.json();
-  if (!data.searchResults?.length) return null;
-  return await storeNewProvider(data.searchResults[0], serviceType, location);
-}
-
-// ✅ Bing Places Provider Search (API Key Required)
-async function findServiceProviderBing(serviceType, location) {
-  let bingUrl = `https://dev.virtualearth.net/REST/v1/LocalSearch/?query=${encodeURIComponent(`${serviceType} in ${location}`)}&key=YOUR_BING_API_KEY&maxResults=1`;
-  let response = await fetch(bingUrl);
-  let data = await response.json();
-  if (!data.resourceSets?.[0]?.resources?.length) return null;
-  return await storeNewProvider(data.resourceSets[0].resources[0], serviceType, location);
-}
-
-// ✅ Yellow Pages Provider Search (API Key Required via Yext or Similar)
-async function findServiceProviderYellowPages(serviceType, location) {
-  let ypUrl = `https://api.yext.com/v2/accounts/me/locations/search?api_key=YOUR_YEXT_API_KEY&v=20230101&query=${encodeURIComponent(`${serviceType} in ${location}`)}&limit=1`;
-  let response = await fetch(ypUrl);
-  let data = await response.json();
-  if (!data.response?.locations?.length) return null;
-  return await storeNewProvider(data.response.locations[0], serviceType, location);
-}
-
-// ✅ Store New Provider in Firestore
+// ✅ **Store New Provider in Firestore**
 async function storeNewProvider(providerData, serviceType, location) {
+  // Normalize provider data from different APIs
   let provider = {
-    name: providerData.name || providerData.display_name?.split(",")[0] || providerData.title || "Unnamed Provider",
-    address: providerData.address || providerData.location?.formatted_address || providerData.formatted_address || providerData.position || "Unknown Address",
-    phone: providerData.phone || providerData.extratags?.phone || providerData.contact?.phone || "Not Available",
-    website: providerData.website || providerData.url || providerData.extratags?.website || "Not Available",
+    name: getProviderName(providerData),
+    address: getProviderAddress(providerData),
+    phone: getProviderPhone(providerData),
+    website: getProviderWebsite(providerData),
     role: "service_provider",
     service: serviceType,
-    subDistrict: location.includes("Unknown") ? null : location,
-    rating: providerData.rating ? Math.min(parseFloat(providerData.rating), 5) : 0,
+    subDistrict: location,
+    rating: getProviderRating(providerData),
     completedJobs: 0,
     availability: "Available",
     activeRequests: 0,
-    signupDate: new Date().toISOString()
+    signupDate: new Date().toISOString(),
+    source: providerData.source || "external_api",
+    coordinates: getProviderCoordinates(providerData)
   };
 
   const docRef = await addDoc(collection(db, "users"), provider);
   provider.id = docRef.id;
 
-  alert(`New service provider added: ${provider.name}`);
+  console.log(`New service provider added: ${provider.name}`);
   return provider;
 }
 
-// ✅ Find Providers from Firestore with Improved Matching
+// Helper functions to normalize provider data from different APIs
+function getProviderName(data) {
+  if (data.name) return data.name;
+  if (data.display_name) return data.display_name.split(",")[0];
+  if (data.title) return data.title;
+  if (data.place_name) return data.place_name.split(",")[0];
+  return "Unknown Provider";
+}
+
+function getProviderAddress(data) {
+  if (data.address) return data.address;
+  if (data.location?.formatted_address) return data.location.formatted_address;
+  if (data.vicinity) return data.vicinity;
+  if (data.display_name) return data.display_name;
+  if (data.location?.address) return data.location.address;
+  return "Unknown Address";
+}
+
+function getProviderPhone(data) {
+  if (data.phone) return data.phone;
+  if (data.extratags?.phone) return data.extratags.phone;
+  if (data.contact?.phone) return data.contact.phone;
+  if (data.tel) return data.tel;
+  return "Not Available";
+}
+
+function getProviderWebsite(data) {
+  if (data.website) return data.website;
+  if (data.url) return data.url;
+  if (data.extratags?.website) return data.extratags.website;
+  if (data.contact?.website) return data.contact.website;
+  if (data.website_url) return data.website_url;
+  return "Not Available";
+}
+
+function getProviderRating(data) {
+  if (data.rating) return data.rating;
+  if (data.avg_rating) return data.avg_rating;
+  if (data.score) return data.score / 2; // Normalize to 5-point scale
+  return 3.5; // Default average rating
+}
+
+function getProviderCoordinates(data) {
+  if (data.lat && data.lon) return new GeoPoint(data.lat, data.lon);
+  if (data.geometry?.coordinates) return new GeoPoint(data.geometry.coordinates[1], data.geometry.coordinates[0]);
+  if (data.position) return new GeoPoint(data.position.lat, data.position.lng);
+  return null;
+}
+
+// ✅ **Find Providers from Firestore with Improved Matching**
 async function findProviders(serviceType, location) {
   const q = query(collection(db, "users"),
     where("role", "==", "service_provider"),
@@ -379,12 +500,12 @@ async function findProviders(serviceType, location) {
   return providers;
 }
 
-// ✅ Fuzzy Matching using Levenshtein Distance
+// ✅ **Fuzzy Matching using Levenshtein Distance**
 function fuzzyMatch(a, b) {
   return a.includes(b) || b.includes(a) || levenshteinDistance(a, b) <= 2;
 }
 
-// ✅ Levenshtein Distance Calculation
+// ✅ **Levenshtein Distance Calculation**
 function levenshteinDistance(s1, s2) {
   const dp = Array(s2.length + 1).fill().map(() => Array(s1.length + 1).fill(0));
   for (let i = 0; i <= s2.length; i++) dp[i][0] = i;
