@@ -177,6 +177,8 @@ document.getElementById("request-service-form").addEventListener("submit", async
 });
 
 
+const CORS_PROXY = "https://corsproxy.io/?"; // Use in development
+
 // ✅ Function to Auto Assign Best Service Provider
 async function autoAssignServiceProvider() {
   let serviceType = document.getElementById("service").value.toLowerCase().trim();
@@ -185,7 +187,6 @@ async function autoAssignServiceProvider() {
   if (!userRef.exists()) return null;
 
   const { subDistrict, district, city, state } = userRef.data();
-
   let locations = [subDistrict, district, city, state];
   let providers = [];
 
@@ -256,37 +257,47 @@ async function findExternalProvider(serviceType, locations) {
   return null;
 }
 
-// ✅ OpenStreetMap API
+// ✅ OpenStreetMap API with CORS Proxy
 async function fetchOpenStreetMap(serviceType, location) {
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${serviceType} in ${location}&extratags=1`);
-    const data = await res.json();
-    return data.length > 0 ? data[0] : null;
-  } catch {
-    return null;
-  }
-}
-
-// ✅ GeoNames API
-async function fetchGeoNames(serviceType, location) {
-  try {
-    const url = `http://api.geonames.org/searchJSON?q=${serviceType}&name_equals=${location}&maxRows=1&username=demo`;
+    const query = `${serviceType} in ${location}`;
+    const url = `${CORS_PROXY}https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&extratags=1`;
     const res = await fetch(url);
     const data = await res.json();
-    return data.geonames?.[0] || null;
-  } catch {
+    console.log("OpenStreetMap response:", data);
+    return data.length > 0 ? data[0] : null;
+  } catch (err) {
+    console.error("OSM error:", err);
     return null;
   }
 }
 
-// ✅ Mapbox API
+// ✅ GeoNames API (replace with your actual username)
+async function fetchGeoNames(serviceType, location) {
+  try {
+    const url = `${CORS_PROXY}http://api.geonames.org/searchJSON?q=${encodeURIComponent(serviceType)}&name_equals=${encodeURIComponent(location)}&maxRows=1&username=your_geonames_username`;
+    const res = await fetch(url);
+    const data = await res.json();
+    console.log("GeoNames response:", data);
+    return data.geonames?.[0] || null;
+  } catch (err) {
+    console.error("GeoNames error:", err);
+    return null;
+  }
+}
+
+// ✅ Mapbox API (corrected query)
 async function fetchMapbox(serviceType, location) {
   try {
     const accessToken = "pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw";
-    const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${serviceType}.json?proximity=${location}&access_token=${accessToken}`);
+    const query = `${serviceType} in ${location}`;
+    const url = `${CORS_PROXY}https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${accessToken}`;
+    const res = await fetch(url);
     const data = await res.json();
+    console.log("Mapbox response:", data);
     return data.features?.[0] || null;
-  } catch {
+  } catch (err) {
+    console.error("Mapbox error:", err);
     return null;
   }
 }
@@ -318,7 +329,7 @@ function getProviderName(d) {
   return d.name || d.display_name?.split(",")[0] || d.title || d.place_name?.split(",")[0] || "Unknown";
 }
 function getProviderAddress(d) {
-  return d.address || d.display_name || d.vicinity || "Unknown Address";
+  return d.address || d.display_name || d.vicinity || d.place_name || "Unknown Address";
 }
 function getProviderPhone(d) {
   return d.phone || d.extratags?.phone || "Not Available";
