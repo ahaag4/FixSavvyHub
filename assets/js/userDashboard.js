@@ -275,7 +275,7 @@ async function fetchOpenStreetMap(serviceType, location) {
 // ✅ GeoNames API (replace with your actual username)
 async function fetchGeoNames(serviceType, location) {
   try {
-    const url = `${CORS_PROXY}http://api.geonames.org/searchJSON?q=${encodeURIComponent(serviceType)}&name_equals=${encodeURIComponent(location)}&maxRows=1&username=your_geonames_username`;
+    const url = `${CORS_PROXY}http://api.geonames.org/searchJSON?q=${encodeURIComponent(serviceType)}&name_equals=${encodeURIComponent(location)}&maxRows=1&username=fixsavvyhub`;
     const res = await fetch(url);
     const data = await res.json();
     console.log("GeoNames response:", data);
