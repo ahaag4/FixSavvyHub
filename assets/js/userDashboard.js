@@ -220,7 +220,7 @@ window.requestGoldPlan = async () => {
   });
 
   // Redirect to payment/confirmation page
-  window.location.href = "upgrade-confirmation.html";
+  window.location.href = "https://youasitube.blogspot.com/p/buy-our-course-learn-everything-you.html?m=1";
 };
 
 // ✅ Optimized Auto Assign Service Provider
