@@ -87,65 +87,61 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   alert("Profile Updated!");
   location.reload();
 });
-// ✅ Check Subscription & Update UI
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
 
   if (subDoc.exists()) {
     const data = subDoc.data();
-    subscriptionPlan = data.plan;
-    remainingRequests = data.remainingRequests;
+
+    // Load base values
+    subscriptionPlan = data.plan || "Free";
+    remainingRequests = data.remainingRequests ?? 1;
     subscriptionStatus = data.status || "Active";
 
-    // ✅ Handle Rejected Plan
+    // --- ✅ Handle REJECTED ---
     if (subscriptionStatus === "Rejected") {
-      const fallbackPlan = data.previousPlan || "Free";
-      const fallbackRequests = data.previousRequests ?? 1;
-
+      alert("Gold plan request was rejected. You're back on your Free plan.");
       await setDoc(doc(db, "subscriptions", userId), {
-        plan: fallbackPlan,
-        remainingRequests: fallbackRequests,
+        plan: "Free",
+        remainingRequests: 1,
         status: "Active"
       });
-
-      alert("Gold plan request was rejected. You're back on your previous plan.");
       location.reload();
       return;
     }
 
-    // ✅ Auto-Downgrade Gold Plan after 30 Days
+    // --- ✅ Handle Expired Gold Plan (30-day limit) ---
     if (subscriptionPlan === "Gold" && subscriptionStatus === "Active" && data.subscribedDate) {
       const subscribedDate = new Date(data.subscribedDate);
       const now = new Date();
-      const diffDays = Math.floor((now - subscribedDate) / (1000 * 60 * 60 * 24));
+      const diffInDays = Math.floor((now - subscribedDate) / (1000 * 60 * 60 * 24));
 
-      if (diffDays >= 30) {
+      if (diffInDays >= 30) {
+        alert("Gold plan expired. Downgraded to Free plan.");
         await setDoc(doc(db, "subscriptions", userId), {
           plan: "Free",
           remainingRequests: 1,
-          status: "Active"
+          status: "Active",
+          lastFreeRequestDate: now.toISOString()
         });
-        alert("Your Gold plan has expired. You have been downgraded to the Free plan.");
         location.reload();
         return;
       }
     }
 
-    // ✅ Give 1 Free Request Monthly if Free User Has 0 Requests
+    // --- ✅ Monthly Free Request for Free Plan (only if 0 requests) ---
     if (subscriptionPlan === "Free" && remainingRequests === 0) {
-      const lastGrantDate = data.lastFreeRequestDate ? new Date(data.lastFreeRequestDate) : null;
-      const today = new Date();
-      const nowMonth = today.getMonth();
-      const nowYear = today.getFullYear();
+      const lastGrant = data.lastFreeRequestDate ? new Date(data.lastFreeRequestDate) : null;
+      const now = new Date();
 
-      const shouldGrant = !lastGrantDate || (
-        lastGrantDate.getMonth() !== nowMonth || lastGrantDate.getFullYear() !== nowYear
-      );
+      const shouldGrant = !lastGrant ||
+        lastGrant.getMonth() !== now.getMonth() ||
+        lastGrant.getFullYear() !== now.getFullYear();
 
       if (shouldGrant) {
         await updateDoc(doc(db, "subscriptions", userId), {
           remainingRequests: 1,
-          lastFreeRequestDate: today.toISOString()
+          lastFreeRequestDate: now.toISOString()
         });
         alert("You've received 1 free request for this month.");
         location.reload();
@@ -153,7 +149,7 @@ async function checkSubscription() {
       }
     }
 
-    // ✅ Update UI
+    // --- ✅ Update UI ---
     document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
     document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
 
@@ -171,7 +167,7 @@ async function checkSubscription() {
       }
     }
   } else {
-    // ✅ New user gets Free plan
+    // First-time setup
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 1,
