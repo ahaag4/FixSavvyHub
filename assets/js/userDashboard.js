@@ -97,19 +97,63 @@ async function checkSubscription() {
     remainingRequests = data.remainingRequests;
     subscriptionStatus = data.status || "Active";
 
-    // If admin rejected Gold request, reset to Free
+    // ✅ Handle Rejected Plan
     if (subscriptionStatus === "Rejected") {
+      const fallbackPlan = data.previousPlan || "Free";
+      const fallbackRequests = data.previousRequests ?? 1;
+
       await setDoc(doc(db, "subscriptions", userId), {
-        plan: "Free",
-        remainingRequests: 1,
+        plan: fallbackPlan,
+        remainingRequests: fallbackRequests,
         status: "Active"
       });
-      alert("Gold plan request was rejected. You're now on Free Plan.");
+
+      alert("Gold plan request was rejected. You're back on your previous plan.");
       location.reload();
       return;
     }
 
-    // Update UI
+    // ✅ Auto-Downgrade Gold Plan after 30 Days
+    if (subscriptionPlan === "Gold" && subscriptionStatus === "Active" && data.subscribedDate) {
+      const subscribedDate = new Date(data.subscribedDate);
+      const now = new Date();
+      const diffDays = Math.floor((now - subscribedDate) / (1000 * 60 * 60 * 24));
+
+      if (diffDays >= 30) {
+        await setDoc(doc(db, "subscriptions", userId), {
+          plan: "Free",
+          remainingRequests: 1,
+          status: "Active"
+        });
+        alert("Your Gold plan has expired. You have been downgraded to the Free plan.");
+        location.reload();
+        return;
+      }
+    }
+
+    // ✅ Give 1 Free Request Monthly if Free User Has 0 Requests
+    if (subscriptionPlan === "Free" && remainingRequests === 0) {
+      const lastGrantDate = data.lastFreeRequestDate ? new Date(data.lastFreeRequestDate) : null;
+      const today = new Date();
+      const nowMonth = today.getMonth();
+      const nowYear = today.getFullYear();
+
+      const shouldGrant = !lastGrantDate || (
+        lastGrantDate.getMonth() !== nowMonth || lastGrantDate.getFullYear() !== nowYear
+      );
+
+      if (shouldGrant) {
+        await updateDoc(doc(db, "subscriptions", userId), {
+          remainingRequests: 1,
+          lastFreeRequestDate: today.toISOString()
+        });
+        alert("You've received 1 free request for this month.");
+        location.reload();
+        return;
+      }
+    }
+
+    // ✅ Update UI
     document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
     document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
 
@@ -127,68 +171,16 @@ async function checkSubscription() {
       }
     }
   } else {
-    // If no subscription doc exists, create one
+    // ✅ New user gets Free plan
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 1,
-      status: "Active"
+      status: "Active",
+      lastFreeRequestDate: new Date().toISOString()
     });
     location.reload();
   }
 }
-
-// ✅ Request Gold Plan (Admin Approval Needed)
-window.requestGoldPlan = async () => {
-  await setDoc(doc(db, "subscriptions", userId), {
-    plan: "Gold",
-    remainingRequests: 35,
-    status: "Pending",
-    subscribedDate: new Date().toISOString()
-  });
-
-  alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
-  location.reload();
-};
-
-// ✅ Request Service & Reduce Limit
-document.getElementById("request-service-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  if (subscriptionStatus === "Pending") {
-    alert("Your subscription upgrade is pending approval. Please wait for admin approval before requesting a service.");
-    return;
-  }
-
-  if (remainingRequests <= 0) {
-    alert("Request limit reached. Upgrade to Gold.");
-    return;
-  }
-
-  const service = document.getElementById("service").value;
-  const serviceProvider = await autoAssignServiceProvider();
-
-  if (!serviceProvider) {
-    alert("No available service providers. Try again later.");
-    return;
-  }
-
-  const docRef = await addDoc(collection(db, "services"), {
-    serviceName: service,
-    requestedBy: userId,
-    assignedTo: serviceProvider,
-    status: "Assigned"
-  });
-
-  latestServiceId = docRef.id;
-
-  // Reduce Remaining Requests
-  await updateDoc(doc(db, "subscriptions", userId), {
-    remainingRequests: remainingRequests - 1
-  });
-
-  alert("Service Requested and Assigned!");
-  location.reload();
-});
 
 
 // ✅ Function to Auto Assign Best Service Provider
