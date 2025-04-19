@@ -97,6 +97,19 @@ async function checkSubscription() {
     remainingRequests = data.remainingRequests;
     subscriptionStatus = data.status || "Active";
 
+    // If admin rejected Gold request, reset to Free
+    if (subscriptionStatus === "Rejected") {
+      await setDoc(doc(db, "subscriptions", userId), {
+        plan: "Free",
+        remainingRequests: 1,
+        status: "Active"
+      });
+      alert("Gold plan request was rejected. You're now on Free Plan.");
+      location.reload();
+      return;
+    }
+
+    // Update UI
     document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
     document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
 
@@ -114,6 +127,7 @@ async function checkSubscription() {
       }
     }
   } else {
+    // If no subscription doc exists, create one
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 1,
@@ -129,7 +143,7 @@ window.requestGoldPlan = async () => {
     plan: "Gold",
     remainingRequests: 35,
     status: "Pending",
-    subscribedDate: new Date().toISOString()  // Store start date of Gold subscription
+    subscribedDate: new Date().toISOString()
   });
 
   alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
@@ -167,7 +181,7 @@ document.getElementById("request-service-form").addEventListener("submit", async
 
   latestServiceId = docRef.id;
 
-  // 🚀 Reduce Remaining Requests
+  // Reduce Remaining Requests
   await updateDoc(doc(db, "subscriptions", userId), {
     remainingRequests: remainingRequests - 1
   });
