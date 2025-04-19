@@ -87,69 +87,76 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   alert("Profile Updated!");
   location.reload();
 });
+
+
+
+// ✅ Check Subscription & Safely Handle Plan Logic
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
+  let needsReload = false;
 
   if (subDoc.exists()) {
     const data = subDoc.data();
-
-    // Load base values
-    subscriptionPlan = data.plan || "Free";
-    remainingRequests = data.remainingRequests ?? 1;
+    subscriptionPlan = data.plan;
+    remainingRequests = data.remainingRequests;
     subscriptionStatus = data.status || "Active";
 
-    // --- ✅ Handle REJECTED ---
+    // ✅ Handle Rejected Plan
     if (subscriptionStatus === "Rejected") {
-      alert("Gold plan request was rejected. You're back on your Free plan.");
+      const fallbackPlan = data.previousPlan || "Free";
+      const fallbackRequests = data.previousRequests ?? 1;
+
       await setDoc(doc(db, "subscriptions", userId), {
-        plan: "Free",
-        remainingRequests: 1,
-        status: "Active"
+        plan: fallbackPlan,
+        remainingRequests: fallbackRequests,
+        status: "Active",
+        lastFreeRequestDate: new Date().toISOString()
       });
-      location.reload();
-      return;
+
+      alert("Gold plan request was rejected. You're back on your previous plan.");
+      needsReload = true;
     }
 
-    // --- ✅ Handle Expired Gold Plan (30-day limit) ---
+    // ✅ Auto-Downgrade Gold Plan after 30 Days
     if (subscriptionPlan === "Gold" && subscriptionStatus === "Active" && data.subscribedDate) {
       const subscribedDate = new Date(data.subscribedDate);
       const now = new Date();
-      const diffInDays = Math.floor((now - subscribedDate) / (1000 * 60 * 60 * 24));
+      const diffDays = Math.floor((now - subscribedDate) / (1000 * 60 * 60 * 24));
 
-      if (diffInDays >= 30) {
-        alert("Gold plan expired. Downgraded to Free plan.");
+      if (diffDays >= 30) {
         await setDoc(doc(db, "subscriptions", userId), {
           plan: "Free",
           remainingRequests: 1,
           status: "Active",
-          lastFreeRequestDate: now.toISOString()
+          lastFreeRequestDate: new Date().toISOString()
         });
-        location.reload();
-        return;
+        alert("Your Gold plan has expired. You have been downgraded to the Free plan.");
+        needsReload = true;
       }
     }
 
-    // --- ✅ Monthly Free Request for Free Plan (only if 0 requests) ---
+    // ✅ Monthly Free Request (Only if requests = 0)
     if (subscriptionPlan === "Free" && remainingRequests === 0) {
-      const lastGrant = data.lastFreeRequestDate ? new Date(data.lastFreeRequestDate) : null;
-      const now = new Date();
+      const lastGrantDate = data.lastFreeRequestDate ? new Date(data.lastFreeRequestDate) : null;
+      const today = new Date();
+      const nowMonth = today.getMonth();
+      const nowYear = today.getFullYear();
 
-      const shouldGrant = !lastGrant ||
-        lastGrant.getMonth() !== now.getMonth() ||
-        lastGrant.getFullYear() !== now.getFullYear();
+      const shouldGrant = !lastGrantDate || (
+        lastGrantDate.getMonth() !== nowMonth || lastGrantDate.getFullYear() !== nowYear
+      );
 
       if (shouldGrant) {
         await updateDoc(doc(db, "subscriptions", userId), {
           remainingRequests: 1,
-          lastFreeRequestDate: now.toISOString()
+          lastFreeRequestDate: today.toISOString()
         });
         alert("You've received 1 free request for this month.");
-        location.reload();
-        return;
+        needsReload = true;
       }
     }
 
-    // --- ✅ Update UI ---
+    // ✅ Update UI
     document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
     document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
 
@@ -166,17 +173,23 @@ async function checkSubscription() {
         upgradeBtn.disabled = false;
       }
     }
+
   } else {
-    // First-time setup
+    // ✅ New user gets Free plan
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 1,
       status: "Active",
       lastFreeRequestDate: new Date().toISOString()
     });
-    location.reload();
+    needsReload = true;
   }
+
+  return needsReload;
 }
+
+
+
 
 
 // ✅ Function to Auto Assign Best Service Provider
