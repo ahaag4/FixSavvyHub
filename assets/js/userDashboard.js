@@ -87,13 +87,9 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   alert("Profile Updated!");
   location.reload();
 });
-
-
-
-// ✅ Check Subscription & Safely Handle Plan Logic
+// ✅ Check Subscription & Update UI
 async function checkSubscription() {
   const subDoc = await getDoc(doc(db, "subscriptions", userId));
-  let needsReload = false;
 
   if (subDoc.exists()) {
     const data = subDoc.data();
@@ -101,62 +97,6 @@ async function checkSubscription() {
     remainingRequests = data.remainingRequests;
     subscriptionStatus = data.status || "Active";
 
-    // ✅ Handle Rejected Plan
-    if (subscriptionStatus === "Rejected") {
-      const fallbackPlan = data.previousPlan || "Free";
-      const fallbackRequests = data.previousRequests ?? 1;
-
-      await setDoc(doc(db, "subscriptions", userId), {
-        plan: fallbackPlan,
-        remainingRequests: fallbackRequests,
-        status: "Active",
-        lastFreeRequestDate: new Date().toISOString()
-      });
-
-      alert("Gold plan request was rejected. You're back on your previous plan.");
-      needsReload = true;
-    }
-
-    // ✅ Auto-Downgrade Gold Plan after 30 Days
-    if (subscriptionPlan === "Gold" && subscriptionStatus === "Active" && data.subscribedDate) {
-      const subscribedDate = new Date(data.subscribedDate);
-      const now = new Date();
-      const diffDays = Math.floor((now - subscribedDate) / (1000 * 60 * 60 * 24));
-
-      if (diffDays >= 30) {
-        await setDoc(doc(db, "subscriptions", userId), {
-          plan: "Free",
-          remainingRequests: 1,
-          status: "Active",
-          lastFreeRequestDate: new Date().toISOString()
-        });
-        alert("Your Gold plan has expired. You have been downgraded to the Free plan.");
-        needsReload = true;
-      }
-    }
-
-    // ✅ Monthly Free Request (Only if requests = 0)
-    if (subscriptionPlan === "Free" && remainingRequests === 0) {
-      const lastGrantDate = data.lastFreeRequestDate ? new Date(data.lastFreeRequestDate) : null;
-      const today = new Date();
-      const nowMonth = today.getMonth();
-      const nowYear = today.getFullYear();
-
-      const shouldGrant = !lastGrantDate || (
-        lastGrantDate.getMonth() !== nowMonth || lastGrantDate.getFullYear() !== nowYear
-      );
-
-      if (shouldGrant) {
-        await updateDoc(doc(db, "subscriptions", userId), {
-          remainingRequests: 1,
-          lastFreeRequestDate: today.toISOString()
-        });
-        alert("You've received 1 free request for this month.");
-        needsReload = true;
-      }
-    }
-
-    // ✅ Update UI
     document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
     document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
 
@@ -173,23 +113,68 @@ async function checkSubscription() {
         upgradeBtn.disabled = false;
       }
     }
-
   } else {
-    // ✅ New user gets Free plan
     await setDoc(doc(db, "subscriptions", userId), {
       plan: "Free",
       remainingRequests: 1,
-      status: "Active",
-      lastFreeRequestDate: new Date().toISOString()
+      status: "Active"
     });
-    needsReload = true;
+    location.reload();
   }
-
-  return needsReload;
 }
 
+// ✅ Request Gold Plan (Admin Approval Needed)
+window.requestGoldPlan = async () => {
+  await setDoc(doc(db, "subscriptions", userId), {
+    plan: "Gold",
+    remainingRequests: 35,
+    status: "Pending",
+    subscribedDate: new Date().toISOString()  // Store start date of Gold subscription
+  });
 
+  alert("Gold Plan Upgrade Requested. Waiting for Admin Approval.");
+  location.reload();
+};
 
+// ✅ Request Service & Reduce Limit
+document.getElementById("request-service-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (subscriptionStatus === "Pending") {
+    alert("Your subscription upgrade is pending approval. Please wait for admin approval before requesting a service.");
+    return;
+  }
+
+  if (remainingRequests <= 0) {
+    alert("Request limit reached. Upgrade to Gold.");
+    return;
+  }
+
+  const service = document.getElementById("service").value;
+  const serviceProvider = await autoAssignServiceProvider();
+
+  if (!serviceProvider) {
+    alert("No available service providers. Try again later.");
+    return;
+  }
+
+  const docRef = await addDoc(collection(db, "services"), {
+    serviceName: service,
+    requestedBy: userId,
+    assignedTo: serviceProvider,
+    status: "Assigned"
+  });
+
+  latestServiceId = docRef.id;
+
+  // 🚀 Reduce Remaining Requests
+  await updateDoc(doc(db, "subscriptions", userId), {
+    remainingRequests: remainingRequests - 1
+  });
+
+  alert("Service Requested and Assigned!");
+  location.reload();
+});
 
 
 // ✅ Function to Auto Assign Best Service Provider
@@ -299,7 +284,7 @@ async function tryFreeAPIs(serviceType, location) {
 
   // 3. Geonames (free tier available)
   try {
-    let geonamesUrl = `http://api.geonames.org/searchJSON?q=${serviceType}&name_equals=${location}&maxRows=1&username=fixsavvyhub`;
+    let geonamesUrl = `http://api.geonames.org/searchJSON?q=${serviceType}&name_equals=${location}&maxRows=1&username=fixsavyhub`;
     let response = await fetch(geonamesUrl);
     let data = await response.json();
     
