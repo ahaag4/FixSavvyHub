@@ -76,31 +76,37 @@ async function checkSubscription() {
     const lastReset = data.lastReset ? new Date(data.lastReset) : null;
 
     // ✅ Auto-expire Gold after 1 month
-    if (currentDate >= subscriptionEndDate) {
-  let newRemaining = data.remainingRequests > 0 ? data.remainingRequests : 1;
+    if (subscriptionPlan === "Gold" && subscribedDate) {
+      const expiryDate = new Date(subscribedDate);
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
 
-  await updateDoc(doc(db, "subscriptions", userId), {
-    plan: "Free",
-    remainingRequests: newRemaining,
-    status: "Expired"
-  });
+      if (today >= expiryDate) {
+        await setDoc(subRef, {
+          plan: "Free",
+          remainingRequests: 1,
+          status: "Expired",
+          lastReset: today.toISOString()
+        }, { merge: true });
 
-  alert("Your Gold subscription has expired. You have been downgraded to the Free plan.");
-  location.reload();
-}
+        alert("Your Gold subscription expired. Downgraded to Free with 1 request.");
+        location.reload();
+        return;
+      }
+    }
 
 // ✅ If Rejected, revert to Free but keep previous remainingRequests
-if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
-  await updateDoc(doc(db, "subscriptions", userId), {
+if (subscriptionStatus === "Rejected") {
+  await updateDoc(subRef, {
     plan: "Free",
     status: "Active"
-    // DO NOT touch remainingRequests
+    // Do not modify remainingRequests
   });
 
-  alert("Gold Plan Rejected. You have been reverted to Free Plan. Your previous request count is preserved.");
+  alert("Gold Plan Rejected. Reverted to Free plan. Old requests preserved.");
   location.reload();
   return;
 }
+
     // ✅ Monthly Reset: Free plan only, if 0 requests
     if (subscriptionPlan === "Free" && remainingRequests <= 0) {
       const needsReset = !lastReset ||
