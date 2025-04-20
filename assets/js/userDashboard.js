@@ -78,19 +78,21 @@ async function checkSubscription() {
 
     // ✅ Revert to Free if Admin Rejected, retain previous requests
     if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
-  const previous = data.previousRequests ?? 0;
+  const previousRequests = data.previousRequests ?? 0;
 
   await setDoc(subRef, {
     plan: "Free",
     status: "Active",
-    remainingRequests: previous, // Restore to what they had
-    lastReset: new Date().toISOString()
+    remainingRequests: previousRequests,
+    subscribedDate: null,
+    previousRequests: null,
+    lastReset: today.toISOString()
   }, { merge: true });
 
-  alert("Gold Plan rejected. Back to Free plan with your previous request count.");
+  alert(`Gold Plan rejected. Restored ${previousRequests} requests from Free plan.`);
   location.reload();
   return;
-    }
+}
 
     // ✅ Gold Plan Expiry (after 1 month)
     if (subscriptionPlan === "Gold" && subscribedDate) {
@@ -163,15 +165,22 @@ async function checkSubscription() {
 window.requestGoldPlan = async () => {
   const subRef = doc(db, "subscriptions", userId);
   const subSnap = await getDoc(subRef);
+  const currentData = subSnap.exists() ? subSnap.data() : {};
+  const alreadyGold = currentData.plan === "Gold" && currentData.status === "Pending";
 
-  const currentRemaining = subSnap.exists() ? subSnap.data().remainingRequests ?? 0 : 0;
+  if (alreadyGold) {
+    alert("Gold Plan is already requested.");
+    return;
+  }
+
+  const currentRemaining = currentData.remainingRequests ?? 0;
 
   await setDoc(subRef, {
     plan: "Gold",
     remainingRequests: 35,
     status: "Pending",
     subscribedDate: new Date().toISOString(),
-    previousRequests: currentRemaining // Save current before upgrading
+    previousRequests: currentRemaining
   }, { merge: true });
 
   alert("Gold Plan requested. Awaiting admin approval.");
