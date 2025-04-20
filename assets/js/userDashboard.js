@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase.js";
 import {
-  doc, setDoc, getDoc, collection, addDoc, query, where, getDocs, updateDoc
+  doc, setDoc, getDoc, collection, addDoc, query, where, getDocs, updateDoc, deleteField
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
@@ -84,7 +84,7 @@ if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
     plan: "Free",
     status: "Active",
     remainingRequests: oldReq,
-    backupRequests: null,  // clear backup
+    backupRequests: deleteField(),  // use deleteField here
     subscribedDate: null
   }, { merge: true });
 
@@ -167,7 +167,6 @@ window.requestGoldPlan = async () => {
 
   if (subSnap.exists()) {
     const currentData = subSnap.data();
-    const currentRequests = currentData.remainingRequests || 0;
 
     // Prevent double-upgrade
     if (currentData.status === "Pending") {
@@ -175,12 +174,14 @@ window.requestGoldPlan = async () => {
       return;
     }
 
+    const currentRequests = currentData.remainingRequests ?? 0;
+
     await setDoc(subRef, {
       plan: "Gold",
       remainingRequests: 35,
       status: "Pending",
       subscribedDate: new Date().toISOString(),
-      backupRequests: currentRequests   // Save current before upgrade
+      backupRequests: currentRequests  // store accurately before any other changes
     }, { merge: true });
 
     alert("Gold Plan requested. Awaiting Admin approval.");
