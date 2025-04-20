@@ -4,7 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
-let latestServiceId = null; // Set to null initially
+let latestServiceId = null;
 let subscriptionPlan = "Free";
 let remainingRequests = 1;
 let subscriptionStatus = "Active";
@@ -18,13 +18,10 @@ auth.onAuthStateChanged(async (user) => {
   }
 
   userId = user.uid;
-  await checkSubscriptionExpiry();  // ✅ Check and expire subscription if needed
   await loadUserProfile();
   await checkSubscription();
   await loadUserServices();
 });
-
-
 
 // ✅ Load Profile
 async function loadUserProfile() {
@@ -44,6 +41,7 @@ async function loadUserProfile() {
     }
   }
 }
+
 document.getElementById("profile-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -61,7 +59,6 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   alert("Profile Updated!");
   location.reload();
 });
-
 
 // ✅ Check Subscription & Auto Handle Status
 async function checkSubscription() {
