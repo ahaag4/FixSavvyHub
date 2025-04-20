@@ -1,6 +1,7 @@
 import { auth, db } from "./firebase.js";
 import {
-  doc, setDoc, getDoc, collection, addDoc, query, where, getDocs, updateDoc, deleteField
+  doc, setDoc, getDoc, collection, addDoc,
+  query, where, getDocs, updateDoc, deleteField
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let userId;
@@ -26,7 +27,6 @@ auth.onAuthStateChanged(async (user) => {
 // ✅ Load Profile
 async function loadUserProfile() {
   const userDoc = await getDoc(doc(db, "users", userId));
-
   if (userDoc.exists()) {
     const userData = userDoc.data();
     document.getElementById("username").value = userData.username || "";
@@ -60,11 +60,10 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   location.reload();
 });
 
-// ✅ Check Subscription & Auto Handle Status
+// ✅ Check Subscription & Handle Auto-logic
 async function checkSubscription() {
   const subRef = doc(db, "subscriptions", userId);
   const subSnap = await getDoc(subRef);
-
   const today = new Date();
 
   if (subSnap.exists()) {
@@ -74,16 +73,15 @@ async function checkSubscription() {
     subscriptionStatus = data.status || "Active";
     const subscribedDate = data.subscribedDate ? new Date(data.subscribedDate) : null;
     const lastReset = data.lastReset ? new Date(data.lastReset) : null;
-    const previousRequests = data.previousRequests ?? data.remainingRequests;
 
-        // ✅ If Gold Rejected → revert to Free and restore backupRequests
+    // ✅ If Gold Plan was Rejected, revert to Free and restore backupRequests
     if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
       const oldReq = typeof data.backupRequests === "number" ? data.backupRequests : 0;
 
       await setDoc(subRef, {
         plan: "Free",
         status: "Active",
-        remainingRequests: data.remainingRequests,
+        remainingRequests: oldReq,
         subscribedDate: null,
         backupRequests: deleteField()
       }, { merge: true });
@@ -93,8 +91,7 @@ async function checkSubscription() {
       return;
     }
 
-
-    // ✅ Gold Plan Expiry (after 1 month)
+    // ✅ Auto-expire Gold after 1 month
     if (subscriptionPlan === "Gold" && subscribedDate) {
       const expiryDate = new Date(subscribedDate);
       expiryDate.setMonth(expiryDate.getMonth() + 1);
@@ -104,16 +101,18 @@ async function checkSubscription() {
           plan: "Free",
           remainingRequests: 1,
           status: "Expired",
+          subscribedDate: null,
+          backupRequests: deleteField(),
           lastReset: today.toISOString()
         }, { merge: true });
 
-        alert("Gold plan expired. Downgraded to Free with 1 request.");
+        alert("Your Gold subscription expired. Downgraded to Free with 1 request.");
         location.reload();
         return;
       }
     }
 
-    // ✅ Monthly Reset for Free plan
+    // ✅ Monthly Reset for Free Plan
     if (subscriptionPlan === "Free" && remainingRequests <= 0) {
       const needsReset = !lastReset ||
         lastReset.getMonth() !== today.getMonth() ||
@@ -131,7 +130,7 @@ async function checkSubscription() {
       }
     }
 
-    // ✅ Update UI
+    // ✅ UI Update
     document.getElementById("plan").innerText = `Current Plan: ${subscriptionPlan}`;
     document.getElementById("remaining-requests").innerText = `Remaining Requests: ${remainingRequests}`;
 
@@ -150,7 +149,7 @@ async function checkSubscription() {
     }
 
   } else {
-    // ✅ First time user setup
+    // ✅ First-time user setup
     await setDoc(subRef, {
       plan: "Free",
       remainingRequests: 1,
@@ -163,34 +162,25 @@ async function checkSubscription() {
 
 // ✅ Request Gold Plan
 window.requestGoldPlan = async () => {
-  const subRef = doc(db, "subscriptions", userId);
-  const subSnap = await getDoc(subRef);
+  const subSnap = await getDoc(doc(db, "subscriptions", userId));
+  const existing = subSnap.exists() ? subSnap.data() : null;
 
-  if (subSnap.exists()) {
-    const currentData = subSnap.data();
+  // Backup old requests before switching
+  const backup = existing ? existing.remainingRequests : 1;
 
-    // Prevent double-upgrade
-    if (currentData.status === "Pending") {
-      alert("Gold Plan already requested and is pending.");
-      return;
-    }
+  await setDoc(doc(db, "subscriptions", userId), {
+    plan: "Gold",
+    remainingRequests: 35,
+    status: "Pending",
+    subscribedDate: new Date().toISOString(),
+    backupRequests: backup
+  }, { merge: true });
 
-    const currentRequests = currentData.remainingRequests ?? 0;
-
-    await setDoc(subRef, {
-      plan: "Gold",
-      remainingRequests: 35,
-      status: "Pending",
-      subscribedDate: new Date().toISOString(),
-      backupRequests: currentRequests  // store accurately before any other changes
-    }, { merge: true });
-
-    alert("Gold Plan requested. Awaiting Admin approval.");
-    location.reload();
-  }
+  alert("Gold Plan requested. Awaiting Admin approval.");
+  location.reload();
 };
 
-// ✅ Request a Service
+// ✅ Request Service
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -221,7 +211,6 @@ document.getElementById("request-service-form").addEventListener("submit", async
 
   latestServiceId = docRef.id;
 
-  // ✅ Decrement remainingRequests
   await updateDoc(doc(db, "subscriptions", userId), {
     remainingRequests: remainingRequests - 1
   });
