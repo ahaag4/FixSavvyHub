@@ -74,8 +74,22 @@ async function checkSubscription() {
     subscriptionStatus = data.status || "Active";
     const subscribedDate = data.subscribedDate ? new Date(data.subscribedDate) : null;
     const lastReset = data.lastReset ? new Date(data.lastReset) : null;
+    const previousRequests = data.previousRequests ?? data.remainingRequests;
 
-    // ✅ Auto-expire Gold after 1 month
+    // ✅ Revert to Free if Admin Rejected, retain previous requests
+    if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
+      await updateDoc(subRef, {
+        plan: "Free",
+        status: "Active",
+        remainingRequests: previousRequests
+      });
+
+      alert("Gold Plan was rejected. You’re back to Free Plan with previous requests.");
+      location.reload();
+      return;
+    }
+
+    // ✅ Gold Plan Expiry (after 1 month)
     if (subscriptionPlan === "Gold" && subscribedDate) {
       const expiryDate = new Date(subscribedDate);
       expiryDate.setMonth(expiryDate.getMonth() + 1);
@@ -88,26 +102,13 @@ async function checkSubscription() {
           lastReset: today.toISOString()
         }, { merge: true });
 
-        alert("Your Gold subscription expired. Downgraded to Free with 1 request.");
+        alert("Gold plan expired. Downgraded to Free with 1 request.");
         location.reload();
         return;
       }
     }
 
-// ✅ If Rejected, revert to Free but keep previous remainingRequests
-if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
-      await updateDoc(doc(db, "subscriptions", userId), {
-        plan: "Free",
-        status: "Active"
-        // Do NOT change remainingRequests
-      });
-
-      alert("Gold Plan was rejected. You are now on Free Plan with your old remaining requests.");
-      location.reload();
-      return;
-    }
-
-    // ✅ Monthly Reset: Free plan only, if 0 requests
+    // ✅ Monthly Reset for Free plan
     if (subscriptionPlan === "Free" && remainingRequests <= 0) {
       const needsReset = !lastReset ||
         lastReset.getMonth() !== today.getMonth() ||
@@ -144,7 +145,7 @@ if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
     }
 
   } else {
-    // ✅ First time user
+    // ✅ First time user setup
     await setDoc(subRef, {
       plan: "Free",
       remainingRequests: 1,
@@ -157,18 +158,24 @@ if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
 
 // ✅ Request Gold Plan
 window.requestGoldPlan = async () => {
-  await setDoc(doc(db, "subscriptions", userId), {
+  const subRef = doc(db, "subscriptions", userId);
+  const subSnap = await getDoc(subRef);
+
+  const currentRemaining = subSnap.exists() ? (subSnap.data().remainingRequests ?? 1) : 1;
+
+  await setDoc(subRef, {
     plan: "Gold",
     remainingRequests: 35,
     status: "Pending",
-    subscribedDate: new Date().toISOString()
-  });
+    subscribedDate: new Date().toISOString(),
+    previousRequests: currentRemaining // Save previous requests
+  }, { merge: true });
 
   alert("Gold Plan requested. Awaiting Admin approval.");
   location.reload();
 };
 
-// ✅ Request Service
+// ✅ Request a Service
 document.getElementById("request-service-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -199,7 +206,7 @@ document.getElementById("request-service-form").addEventListener("submit", async
 
   latestServiceId = docRef.id;
 
-  // ✅ Reduce request count
+  // ✅ Decrement remainingRequests
   await updateDoc(doc(db, "subscriptions", userId), {
     remainingRequests: remainingRequests - 1
   });
