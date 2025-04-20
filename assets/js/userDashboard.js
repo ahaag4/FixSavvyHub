@@ -78,18 +78,33 @@ async function checkSubscription() {
 
     // ✅ Revert to Free if Admin Rejected, retain previous requests
     if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
-  const previousRequests = data.previousRequests ?? 0;
+  const previousRequests = data.previousRequests;
 
-  await setDoc(subRef, {
-    plan: "Free",
-    status: "Active",
-    remainingRequests: previousRequests,
-    subscribedDate: null,
-    previousRequests: null,
-    lastReset: today.toISOString()
-  }, { merge: true });
+  if (typeof previousRequests === "number") {
+    await setDoc(subRef, {
+      plan: "Free",
+      status: "Active",
+      remainingRequests: previousRequests,
+      previousRequests: null,  // Clear to avoid misuse
+      subscribedDate: null,
+      lastReset: today.toISOString()
+    }, { merge: true });
 
-  alert(`Gold Plan rejected. Restored ${previousRequests} requests from Free plan.`);
+    alert(`Gold Plan rejected. You are now on Free Plan with your previous ${previousRequests} request(s).`);
+  } else {
+    // fallback: treat as 1 request if not stored properly
+    await setDoc(subRef, {
+      plan: "Free",
+      status: "Active",
+      remainingRequests: 1,
+      previousRequests: null,
+      subscribedDate: null,
+      lastReset: today.toISOString()
+    }, { merge: true });
+
+    alert("Gold Plan rejected. Previous requests not found, reset to Free Plan with 1 request.");
+  }
+
   location.reload();
   return;
 }
@@ -165,26 +180,29 @@ async function checkSubscription() {
 window.requestGoldPlan = async () => {
   const subRef = doc(db, "subscriptions", userId);
   const subSnap = await getDoc(subRef);
-  const currentData = subSnap.exists() ? subSnap.data() : {};
-  const alreadyGold = currentData.plan === "Gold" && currentData.status === "Pending";
 
-  if (alreadyGold) {
-    alert("Gold Plan is already requested.");
-    return;
+  if (subSnap.exists()) {
+    const data = subSnap.data();
+
+    if (data.status === "Pending") {
+      alert("Gold Plan is already requested and pending.");
+      return;
+    }
+
+    // Save previous remainingRequests only if not already saved
+    const previous = data.remainingRequests ?? 0;
+
+    await setDoc(subRef, {
+      plan: "Gold",
+      remainingRequests: 35,
+      status: "Pending",
+      subscribedDate: new Date().toISOString(),
+      previousRequests: previous  // <- Save it for rollback
+    }, { merge: true });
+
+    alert("Gold Plan requested. Awaiting admin approval.");
+    location.reload();
   }
-
-  const currentRemaining = currentData.remainingRequests ?? 0;
-
-  await setDoc(subRef, {
-    plan: "Gold",
-    remainingRequests: 35,
-    status: "Pending",
-    subscribedDate: new Date().toISOString(),
-    previousRequests: currentRemaining
-  }, { merge: true });
-
-  alert("Gold Plan requested. Awaiting admin approval.");
-  location.reload();
 };
 
 // ✅ Request a Service
