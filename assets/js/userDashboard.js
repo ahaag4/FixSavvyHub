@@ -80,11 +80,10 @@ async function checkSubscription() {
 if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
   const oldReq = typeof data.backupRequests === "number" ? data.backupRequests : 0;
 
-  // If backupRequests was stored as 5, make sure you only use the actual oldReq, not 5
   await setDoc(subRef, {
     plan: "Free",
     status: "Active",
-    remainingRequests: backupRequests,  // Set remainingRequests to the backupRequests value (oldReq)
+    remainingRequests: oldReq,  // Set remainingRequests to the backupRequests value (oldReq)
     backupRequests: deleteField(),  // Use deleteField to remove backupRequests from the document
     subscribedDate: null
   }, { merge: true });
