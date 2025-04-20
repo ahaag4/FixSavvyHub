@@ -94,19 +94,18 @@ async function checkSubscription() {
       }
     }
 
-    // ✅ If Rejected, revert to Free
-    if (subscriptionStatus === "Rejected") {
-      await setDoc(subRef, {
-        plan: "Free",
-        remainingRequests: 1,
-        status: "Active",
-        lastReset: today.toISOString()
-      }, { merge: true });
+    // ✅ If Rejected, revert to Free but keep previous remainingRequests
+if (subscriptionStatus === "Rejected") {
+  await updateDoc(subRef, {
+    plan: "Free",
+    status: "Active"
+    // Do not modify remainingRequests
+  });
 
-      alert("Gold Plan Rejected. Reverted to Free plan with 1 request.");
-      location.reload();
-      return;
-    }
+  alert("Gold Plan Rejected. Reverted to Free plan. Old requests preserved.");
+  location.reload();
+  return;
+}
 
     // ✅ Monthly Reset: Free plan only, if 0 requests
     if (subscriptionPlan === "Free" && remainingRequests <= 0) {
