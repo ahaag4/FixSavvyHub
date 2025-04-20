@@ -83,8 +83,8 @@ if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
   await setDoc(subRef, {
     plan: "Free",
     status: "Active",
-    remainingRequests: oldReq,
-    backupRequests: deleteField(),  // use deleteField here
+    remainingRequests: oldReq,  // Restore the previous remaining requests
+    backupRequests: deleteField(),  // Use deleteField to remove backupRequests
     subscribedDate: null
   }, { merge: true });
 
