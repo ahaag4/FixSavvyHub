@@ -77,20 +77,29 @@ async function checkSubscription() {
     const previousRequests = data.previousRequests ?? data.remainingRequests;
 
     // ✅ If Rejected, revert to Free but restore old remainingRequests
-if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
-  const oldReq = typeof data.backupRequests === "number" ? data.backupRequests : 0;
+const docRef = firestore.collection('subscriptions').doc(userId);
+const doc = await docRef.get();
 
-  await setDoc(subRef, {
-    plan: "Free",
-    status: "Active",
-    remainingRequests: oldReq,  // Restore backup
-    backupRequests: deleteField(),  // Remove backup so not reused
-    subscribedDate: null
-  }, { merge: true });
+if (doc.exists) {
+    const data = doc.data();
 
-  alert(`Gold Plan was rejected. Restored your previous ${oldReq} request(s).`);
-  location.reload();
-  return;
+    const plan = data.plan;
+    const status = data.status;
+
+    if (plan === 'Gold' && status === 'Rejected') {
+        const oldReq = typeof data.backupRequests === "number" ? data.backupRequests : 0;
+
+        await docRef.update({
+            plan: "Free",
+            status: "Active", // or keep "Rejected" if you want to track it
+            remainingRequests: oldReq,
+            backupRequests: firebase.firestore.FieldValue.delete(),
+            subscribedDate: null
+        });
+
+        alert(`Your upgrade was rejected. Restored ${oldReq} request(s).`);
+        location.reload();
+    }
 }
 
     // ✅ Gold Plan Expiry (after 1 month)
