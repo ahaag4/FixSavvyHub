@@ -76,35 +76,19 @@ async function checkSubscription() {
     const lastReset = data.lastReset ? new Date(data.lastReset) : null;
     const previousRequests = data.previousRequests ?? data.remainingRequests;
 
-    // ✅ Revert to Free if Admin Rejected, retain previous requests
-    if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
-  const previousRequests = data.previousRequests;
+    // ✅ If Rejected, revert to Free but restore old remainingRequests
+if (subscriptionPlan === "Gold" && subscriptionStatus === "Rejected") {
+  const oldReq = typeof data.backupRequests === "number" ? data.backupRequests : 0;
 
-  if (typeof previousRequests === "number") {
-    await setDoc(subRef, {
-      plan: "Free",
-      status: "Active",
-      remainingRequests: previousRequests,
-      previousRequests: null,  // Clear to avoid misuse
-      subscribedDate: null,
-      lastReset: today.toISOString()
-    }, { merge: true });
+  await setDoc(subRef, {
+    plan: "Free",
+    status: "Active",
+    remainingRequests: oldReq,
+    backupRequests: null,  // clear backup
+    subscribedDate: null
+  }, { merge: true });
 
-    alert(`Gold Plan rejected. You are now on Free Plan with your previous ${previousRequests} request(s).`);
-  } else {
-    // fallback: treat as 1 request if not stored properly
-    await setDoc(subRef, {
-      plan: "Free",
-      status: "Active",
-      remainingRequests: 1,
-      previousRequests: null,
-      subscribedDate: null,
-      lastReset: today.toISOString()
-    }, { merge: true });
-
-    alert("Gold Plan rejected. Previous requests not found, reset to Free Plan with 1 request.");
-  }
-
+  alert(`Gold Plan was rejected. Restored your previous ${oldReq} request(s).`);
   location.reload();
   return;
 }
@@ -182,25 +166,24 @@ window.requestGoldPlan = async () => {
   const subSnap = await getDoc(subRef);
 
   if (subSnap.exists()) {
-    const data = subSnap.data();
+    const currentData = subSnap.data();
+    const currentRequests = currentData.remainingRequests || 0;
 
-    if (data.status === "Pending") {
-      alert("Gold Plan is already requested and pending.");
+    // Prevent double-upgrade
+    if (currentData.status === "Pending") {
+      alert("Gold Plan already requested and is pending.");
       return;
     }
-
-    // Save previous remainingRequests only if not already saved
-    const previous = data.remainingRequests ?? 0;
 
     await setDoc(subRef, {
       plan: "Gold",
       remainingRequests: 35,
       status: "Pending",
       subscribedDate: new Date().toISOString(),
-      previousRequests: previous  // <- Save it for rollback
+      backupRequests: currentRequests   // Save current before upgrade
     }, { merge: true });
 
-    alert("Gold Plan requested. Awaiting admin approval.");
+    alert("Gold Plan requested. Awaiting Admin approval.");
     location.reload();
   }
 };
