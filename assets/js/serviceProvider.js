@@ -23,7 +23,6 @@ auth.onAuthStateChanged(async (user) => {
   await loadAssignedServices();
   await loadServiceHistory();
   await loadSummary();
-  await updateRequestInfoUI(); // New: Show request info
 });
 
 // ✅ Section 1: Complete Profile (with Service Selection)
@@ -38,13 +37,15 @@ async function loadServiceProviderProfile() {
     
     // Populate service dropdown
     const serviceSelect = document.getElementById("service");
-    const services = ["Plumbing", "Electrician", "Carpentry", "Painting", "AC Repair", "Cleaning"];
+    const services = ["Plumbing", "Electrician", "Carpentry", "Painting", "AC Repair", "Cleaning"]; // Add more as needed
     serviceSelect.innerHTML = `<option value="" disabled>Select Service</option>`;
     services.forEach(service => {
       const option = document.createElement("option");
       option.value = service;
       option.textContent = service;
-      if (userData.service === service) option.selected = true;
+      if (userData.service === service) {
+        option.selected = true;
+      }
       serviceSelect.appendChild(option);
     });
 
@@ -68,19 +69,15 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   const service = document.getElementById("service").value;
   const govIDFile = document.getElementById("gov-id").files[0];
 
-  const govIDURL = govIDFile ? URL.createObjectURL(govIDFile) : "";
+  const govIDURL = URL.createObjectURL(govIDFile);
 
   await setDoc(doc(db, "users", userId), {
     username, phone, address, service,
     govID: govIDURL,
-    role: "service_provider",
-    freeRequests: 1,
-    upgradeStatus: "none",
-    requestLimit: 1,
-    usedRequests: 0
+    role: "service_provider"
   }, { merge: true });
 
-  alert("Profile Updated! You get 1 free service request");
+  alert("Profile Updated!");
   location.reload();
 });
 
@@ -92,12 +89,14 @@ async function loadAssignedServices() {
   const container = document.getElementById("assigned-service");
   container.innerHTML = "";
 
-  for (const docSnap of querySnapshot.docs) {
+  querySnapshot.forEach(async (docSnap) => {
     const data = docSnap.data();
     const userRef = await getDoc(doc(db, "users", data.requestedBy));
     const user = userRef.data();
 
-    if (data.status === "Cancelled" || data.status === "Completed") continue;
+    if (data.status === "Cancelled" || data.status === "Completed") {
+      return;
+    }
 
     container.innerHTML += `
       <div>
@@ -110,7 +109,7 @@ async function loadAssignedServices() {
       </div>
       <hr>
     `;
-  }
+  });
 }
 
 // ✅ Mark Service Completed
@@ -121,7 +120,7 @@ window.markCompleted = async (serviceId) => {
 };
 
 // ✅ Load Service History
-async function loadService2History() {
+async function loadServiceHistory() {
   const q = query(collection(db, "services"), where("assignedTo", "==", userId));
   const querySnapshot = await getDocs(q);
 
@@ -130,6 +129,7 @@ async function loadService2History() {
 
   querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
+
     container.innerHTML += `
       <div>
         <p><b>Service:</b> ${data.serviceName}</p>
@@ -150,7 +150,7 @@ async function loadSummary() {
   querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
     if (data.status === "Completed") {
-      completed2Services++;
+      completedServices++;
       totalEarnings += 300;
       if (data.rating) {
         totalRatings += parseInt(data.rating);
@@ -170,53 +170,7 @@ async function loadSummary() {
   document.getElementById("average-rating").innerText = avgRating;
 }
 
-// ✅ Update Request Info UI
-async function updateRequestInfoUI() {
-  const userDoc = await getDoc(doc(db, "users", userId));
-  if (!userDoc.exists()) return;
-
-  const userData = userDoc.data();
-  const remaining = (userData.freeRequests || 0) + (userData.requestLimit || 0) - (userData.usedRequests || 0);
-  document.getElementById("remaining-requests").innerText = remaining;
-  document.getElementById("upgrade-status").innerText =
-    userData.upgradeStatus ? userData.upgradeStatus.charAt(0).toUpperCase() + userData.upgradeStatus.slice(1) : "None";
-}
-
-// ✅ Request Upgrade
-window.requestUpgrade = async function() {
-  await updateDoc(doc(db, "users", userId), {
-    upgradeStatus: "pending"
-  });
-  alert("Upgrade request sent to admin");
-  updateRequestInfoUI();
-};
-
-// ✅ Example: Create a Service Request (add a button in HTML with onclick="createServiceRequest()")
-window.createServiceRequest = async function() {
-  const userDoc = await getDoc(doc(db, "users", userId));
-  const userData = userDoc.data();
-  const remaining = (userData.freeRequests || 0) + (userData.requestLimit || 0) - (userData.usedRequests || 0);
-
-  if (remaining <= 0) {
-    alert("Request limit reached! Please upgrade your account.");
-    return;
-  }
-
-  let updateData = {};
-  if (userData.freeRequests > 0) {
-    updateData.freeRequests = userData.freeRequests - 1;
-  } else {
-    updateData.usedRequests = (userData.usedRequests || 0) + 1;
-  }
-  await updateDoc(doc(db, "users", userId), updateData);
-
-  // Here you would actually create the service request
-  // await setDoc(doc(collection(db, "services")), { ... });
-  alert("Service request created! Remaining requests: " + (remaining - 1));
-
-  updateRequestInfoUI();
-};
-
 // ✅ View Profile
 document.getElementById("view-profile").href = `profile.html`;
+
     
